@@ -41,7 +41,8 @@ def _run_job(job: ScanJob) -> None:
         limitations = [
             DISCLAIMER,
             "Oracle 공지에서 명시한 정확한 빌드만 영향 대상으로 판정합니다.",
-            "OpenJDK 계열은 배포판별 수정 공지가 DB에 없어 UNKNOWN으로 판정합니다.",
+            "공식 영향·해결 목록에 없는 버전은 NOT_ASSESSED로 판정합니다.",
+            "OpenJDK 계열은 배포판별 수정 공지가 DB에 없어 NOT_ASSESSED로 판정합니다.",
             "탐색 제한 밖의 애플리케이션 내장 런타임은 발견되지 않을 수 있습니다.",
         ]
         if result.stopped:
@@ -157,12 +158,14 @@ if "job" in st.session_state:
         rows = _finding_rows(report)
         affected_assets = {f.discovered_path for f in report.findings if f.status == Status.AFFECTED}
         fixed_assets = {f.discovered_path for f in report.findings if f.status == Status.FIXED}
+        not_assessed_assets = {f.discovered_path for f in report.findings if f.status == Status.NOT_ASSESSED}
         unknown_assets = {f.discovered_path for f in report.findings if f.status == Status.UNKNOWN}
-        cols = st.columns(4)
+        cols = st.columns(5)
         cols[0].metric("전체 탐지 자산", len(report.assets))
         cols[1].metric("영향 확인 자산", len(affected_assets))
         cols[2].metric("수정 확인 자산", len(fixed_assets))
-        cols[3].metric("판정 불가 자산", len(unknown_assets))
+        cols[3].metric("미평가 자산", len(not_assessed_assets))
+        cols[4].metric("정보 부족 자산", len(unknown_assets))
 
         st.subheader("CVE별 발견 현황")
         cve_counts: dict[str, int] = {}

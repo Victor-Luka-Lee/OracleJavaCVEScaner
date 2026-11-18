@@ -37,9 +37,9 @@ Bounded Discovery ── release/레지스트리/패키지 근거 ──▶ Asse
 ## 판정 보수성
 
 1. 공식 데이터 검증에 실패하면 스캔 자체를 중단합니다.
-2. 비 Oracle OpenJDK에는 Oracle 수정 버전을 전용하지 않고 `UNKNOWN`을 반환합니다.
-3. Oracle 제품이어도 버전을 파싱하지 못하면 `UNKNOWN`입니다.
+2. 비 Oracle OpenJDK에는 Oracle 수정 버전을 전용하지 않습니다. 벤더가 식별됐지만 해당 공지가 없으면 `NOT_ASSESSED`, 벤더가 불명확하면 `UNKNOWN`입니다.
+3. Oracle 제품이어도 버전 또는 비교에 필요한 세부 build를 확보하지 못하면 `UNKNOWN`입니다.
 4. 영향 목록은 정확히 일치해야 `AFFECTED`입니다.
-5. KISA 해결 버전과 같은 기능 계열에서 그 이상인 경우에만 `FIXED`입니다.
-6. 나머지는 해당 CVE의 열거 조건상 `NOT_AFFECTED`이며, 다른 취약점이나 지원 상태에 대한 안전 선언이 아님을 근거에 포함합니다.
+5. Java 8은 update와 build를 독립적으로 비교합니다. 해결 update가 같을 때는 공식 build 이상임을 확인해야 `FIXED`입니다.
+6. 공식 영향·해결 목록에 없는 버전은 `NOT_ASSESSED`입니다. 제품 자체가 공식 대상과 명백히 다를 때만 `NOT_AFFECTED`입니다.
 

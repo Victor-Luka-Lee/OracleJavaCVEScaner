@@ -10,6 +10,15 @@ def test_java8_update_and_build_parsing():
     assert dotted.same_release(compact)
 
 
+def test_java8_solution_label_and_concrete_build_are_distinct():
+    label = JavaVersion.parse("8u513")
+    concrete = JavaVersion.parse("1.8.0_513-b04")
+    assert label.update == concrete.update == 513
+    assert label.build is None
+    assert concrete.build == 4
+    assert concrete > label
+
+
 def test_modern_versions_compare_numerically():
     assert JavaVersion.parse("11.0.33.1") > JavaVersion.parse("11.0.33.0.3")
     assert JavaVersion.parse("17.0.21.1") > JavaVersion.parse("17.0.21.0.3")

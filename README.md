@@ -14,7 +14,7 @@ JVI는 Windows와 Linux에서 Java 런타임을 **읽기 전용으로 탐색**�
 
 포함 CVE는 `CVE-2026-86144`, `CVE-2026-114938`~`CVE-2026-114942`입니다. KISA의 영향 버전과 해결 버전, Oracle의 제품·구성요소·적용 조건·CVSS를 기록했습니다. 공식 문서에 열거된 빌드만 `AFFECTED`로 평가하며, 근거 없이 이전 버전 전체를 영향 범위로 확장하지 않습니다.
 
-Oracle Java SE, Oracle JavaFX, Oracle GraalVM for JDK, Oracle GraalVM Enterprise Edition 규칙은 제품별로 분리되어 있습니다. Eclipse Temurin, Amazon Corretto, Azul Zulu, Microsoft Build of OpenJDK, Red Hat OpenJDK 등은 Oracle 해결 버전을 그대로 적용하지 않습니다. 배포판별 공식 수정 근거가 이 MVP 데이터에 없으므로 해당 자산은 `UNKNOWN`입니다.
+Oracle Java SE, Oracle JavaFX, Oracle GraalVM for JDK, Oracle GraalVM Enterprise Edition 규칙은 제품별로 분리되어 있습니다. Eclipse Temurin, Amazon Corretto, Azul Zulu, Microsoft Build of OpenJDK, Red Hat OpenJDK 등은 Oracle 해결 버전을 그대로 적용하지 않습니다. 배포판별 공식 수정 근거가 이 MVP 데이터에 없으므로 식별된 자산은 `NOT_ASSESSED`입니다. 공급업체나 세부 빌드를 식별하지 못한 경우는 `UNKNOWN`입니다.
 
 ## 빠른 시작
 
@@ -79,12 +79,15 @@ python -m jvi ui
 | 결과 | 의미 |
 |---|---|
 | `AFFECTED` | 공급업체·제품·변형·정확한 버전/빌드가 공식 영향 목록과 일치 |
-| `FIXED` | 같은 Java 기능 계열에서 KISA 해결 버전 이상이 명확히 식별됨 |
-| `NOT_AFFECTED` | 공식 공지의 제품 또는 열거된 버전 조건과 불일치 |
+| `FIXED` | KISA 해결 버전의 update/build 기준 충족이 명확히 식별됨 |
+| `NOT_AFFECTED` | 공식 공지의 대상 제품과 명백히 다른 경우에만 사용 |
+| `NOT_ASSESSED` | 자산은 식별됐지만 공식 영향·해결 목록이 해당 버전의 안전 여부를 다루지 않음 |
 | `POTENTIALLY_AFFECTED` | Oracle 제품은 확인했으나 SE/JavaFX/GraalVM 변형을 확정하지 못함 |
-| `UNKNOWN` | 버전 부족 또는 OpenJDK 배포판별 공식 수정 근거 부재 |
+| `UNKNOWN` | 공급업체, 버전 또는 필수 세부 빌드가 부족해 비교 자체가 불가능 |
 
 `AFFECTED`는 버전 영향 여부입니다. 공격자 입력이 특정 API에 도달하는지, 샌드박스형 클라이언트인지, 사용자 상호작용이 가능한지 등의 **실제 공격 가능성**은 별도 필드로 보고합니다.
+
+Java 8은 update와 build를 독립적으로 비교합니다. KISA 표기의 `8u513 (1.8.0_513-b04)`에서 `8u513`은 업데이트 계열 이름이고 실제 확인 기준은 `b04`입니다. 따라서 `8u513`처럼 build가 없는 자산은 `FIXED`가 아니라 `UNKNOWN`, `1.8.0_513-b03`은 `NOT_ASSESSED`, `1.8.0_513-b04` 이상은 `FIXED`입니다.
 
 ## 탐색과 제품 식별
 
@@ -115,7 +118,7 @@ tests/          가상 release fixture 기반 pytest
 pytest
 ```
 
-테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. Java 8 update/build, 현대 버전 비교, perf 변형, Oracle/OpenJDK 구분, CVE별 매칭과 해결 버전, 정보 부족, 다중 설치, 링크 순환, 권한 오류, Java 미설치, JSON/CSV/HTML 생성 및 DB 무결성 거부를 다룹니다.
+테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. Java 8 update/build, 현대 버전 비교, perf 변형, Oracle/OpenJDK 구분, 공식 영향·해결 빌드, 동일 update의 다른 build, 세부 build 누락, 목록에 없는 구버전, 지원 종료 메타데이터, 불명확한 공급업체, 변경 전후 회귀 행렬, 다중 설치, 링크 순환, 권한 오류, Java 미설치, JSON/CSV/HTML 생성 및 DB 무결성 거부를 다룹니다.
 
 ## 보안 특성
 
@@ -142,6 +145,6 @@ pytest
 - JavaFX 탐지는 `javafx.properties`가 있는 설치를 우선 지원하며 모듈 JAR 내부 manifest까지 열지는 않습니다.
 - 컨테이너 이미지, 원격 호스트, 압축 아카이브 내부는 스캔하지 않습니다.
 - Windows Store/MSI 전체 인벤토리와 Linux 컨테이너 패키지 DB는 별도 수집하지 않습니다.
-- OpenJDK 벤더별 2026년 11월 공지는 이 검증 데이터 세트에 포함하지 않았으므로 수정 여부를 추정하지 않습니다.
+- OpenJDK 벤더별 2026년 11월 공지는 이 검증 데이터 세트에 포함하지 않았으므로 `NOT_ASSESSED`로 두며 수정 여부를 추정하지 않습니다.
 - 공식 공지의 버전 판정과 실제 애플리케이션 입력 경로·CPU 특성·샌드박스 조건 검증은 별개입니다.
 

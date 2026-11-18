@@ -113,16 +113,16 @@ def html_report(report: ScanReport) -> str:
 *{{box-sizing:border-box}}body{{margin:0;background:#f5f7fa;color:#1d2733;font:14px/1.55 Arial,"Noto Sans KR",sans-serif}}
 main{{max-width:1200px;margin:28px auto;padding:0 22px}}header{{background:var(--navy);color:white;padding:26px;border-radius:10px}}
 h1{{margin:0 0 6px;font-size:27px}}h2{{margin:28px 0 10px;color:var(--navy)}}.muted{{color:#d7dfeb}}.warning{{background:#fff3cd;border-left:5px solid #d59a00;padding:13px;margin-top:16px}}
-.metrics{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0}}.metric{{background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px #ccd2da}}.metric b{{display:block;font-size:23px}}
+.metrics{{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:18px 0}}.metric{{background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px #ccd2da}}.metric b{{display:block;font-size:23px}}
 table{{width:100%;border-collapse:collapse;background:white}}th,td{{padding:10px;border:1px solid #dce1e7;text-align:left;vertical-align:top}}th{{background:#edf2f7}}.badge{{font-weight:bold}}
-.affected{{color:var(--red)}}.fixed{{color:var(--green)}}.unknown,.potentially_affected{{color:var(--amber)}}.not_affected{{color:var(--gray)}}
+.affected{{color:var(--red)}}.fixed{{color:var(--green)}}.unknown,.not_assessed,.potentially_affected{{color:var(--amber)}}.not_affected{{color:var(--gray)}}
 dl{{display:grid;grid-template-columns:150px 1fr;background:white;padding:14px}}dt{{font-weight:bold}}dd{{margin:0}}code{{white-space:pre-wrap}}@media(max-width:800px){{.metrics{{grid-template-columns:1fr 1fr}}table{{display:block;overflow:auto}}}}
 </style></head><body><main><header><h1>Java Vulnerability Inspector</h1><div class="muted">점검 시각: {escape(report.scan_time)} · DB: {escape(report.database_version)}</div></header>
 <div class="warning"><strong>점검 한계:</strong> {DISCLAIMER}</div>
 <section class="metrics">
 <div class="metric">전체 자산<b>{len(report.assets)}</b></div><div class="metric">영향 확인<b>{counts[Status.AFFECTED]}</b></div>
-<div class="metric">수정 확인<b>{counts[Status.FIXED]}</b></div><div class="metric">잠재 영향<b>{counts[Status.POTENTIALLY_AFFECTED]}</b></div>
-<div class="metric">판정 불가<b>{counts[Status.UNKNOWN]}</b></div></section>
+<div class="metric">수정 확인<b>{counts[Status.FIXED]}</b></div><div class="metric">미평가<b>{counts[Status.NOT_ASSESSED]}</b></div>
+<div class="metric">잠재 영향<b>{counts[Status.POTENTIALLY_AFFECTED]}</b></div><div class="metric">정보 부족<b>{counts[Status.UNKNOWN]}</b></div></section>
 <h2>점검 환경</h2><dl>{env_items}<dt>점검 범위</dt><dd><code>{scope_json}</code></dd></dl>
 <h2>탐지한 Java 제품</h2><table><thead><tr><th>공급업체</th><th>제품</th><th>배포판</th><th>버전</th><th>변형</th><th>경로</th></tr></thead><tbody>{asset_rows}</tbody></table>
 <h2>제품별 CVE 판정</h2><table><thead><tr><th>CVE</th><th>판정</th><th>제품</th><th>버전</th><th>근거</th><th>권고</th></tr></thead><tbody>{finding_rows}</tbody></table>

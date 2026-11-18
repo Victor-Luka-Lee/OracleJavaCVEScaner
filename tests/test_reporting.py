@@ -26,10 +26,12 @@ def test_json_csv_html_reports_are_generated(database, asset_factory):
     csv_text = csv_report(report)
     assert "cve_id,status,vendor" in csv_text
     assert "CVE-2026-114941,AFFECTED" in csv_text
+    assert "NOT_ASSESSED" in csv_text
     html = html_report(report)
     assert "<!doctype html>" in html.lower()
     assert DISCLAIMER in html
     assert "https://www.oracle.com/security-alerts/cspunov2026.html" in html
+    assert "NOT_ASSESSED" in html
     assert "<script" not in html.lower()
 
 

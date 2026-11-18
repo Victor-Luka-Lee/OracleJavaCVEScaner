@@ -22,6 +22,7 @@ def make_asset(
     distribution: str = "Oracle JDK/JRE",
     path: str = "/virtual/java",
     special_build: str | None = None,
+    metadata: dict[str, str] | None = None,
 ) -> Asset:
     parsed = JavaVersion.parse(version) if version else None
     return Asset(
@@ -35,6 +36,7 @@ def make_asset(
         special_build=special_build if special_build is not None else (parsed.variant if parsed else None),
         install_path=path,
         evidence=["pytest virtual asset"],
+        metadata=metadata or {},
     )
 
 

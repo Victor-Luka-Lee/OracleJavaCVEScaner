@@ -72,7 +72,8 @@ def build_report(args: argparse.Namespace) -> ScanReport:
     limitations = [
         DISCLAIMER,
         "Oracle 공지에 명시된 정확한 제품/빌드만 영향 범위로 사용하며 이전 버전을 임의 확장하지 않습니다.",
-        "OpenJDK 계열은 배포판별 공식 수정 공지가 이 DB에 없으면 UNKNOWN입니다.",
+        "공식 영향·해결 목록에 없는 버전은 안전으로 간주하지 않고 NOT_ASSESSED로 분류합니다.",
+        "OpenJDK 계열은 배포판별 공식 수정 공지가 이 DB에 없으면 NOT_ASSESSED입니다.",
         "기본 점검은 release 파일과 로컬 메타데이터를 사용하며 Java 바이너리를 실행하지 않습니다.",
         "내장 런타임은 설정한 깊이·파일 수·시간 제한 안에서만 발견됩니다.",
     ]
@@ -115,7 +116,12 @@ def _human_summary(report: ScanReport) -> str:
     for asset in report.assets:
         lines.append(f"- {asset.vendor} / {asset.product} / {asset.full_version or 'UNKNOWN'} / {asset.install_path}")
         for finding in (item for item in report.findings if item.asset is asset):
-            if finding.status in {Status.AFFECTED, Status.POTENTIALLY_AFFECTED, Status.UNKNOWN}:
+            if finding.status in {
+                Status.AFFECTED,
+                Status.POTENTIALLY_AFFECTED,
+                Status.NOT_ASSESSED,
+                Status.UNKNOWN,
+            }:
                 lines.append(f"  {finding.cve_id}: {finding.status.value} - {finding.rationale}")
     if report.errors:
         lines.append(f"탐색 오류: {len(report.errors)}건 (--verbose 로그 또는 JSON/HTML 보고서 확인)")
