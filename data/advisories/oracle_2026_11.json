@@ -1,0 +1,194 @@
+{
+  "schema_version": "1.0",
+  "database_version": "2026.11.18.1",
+  "title": "Oracle Critical Security Patch Update - November 2026 (JVI verified subset)",
+  "published_date": "2026-11-17",
+  "updated_date": "2026-11-18",
+  "sources": [
+    "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313",
+    "https://www.oracle.com/security-alerts/cspunov2026.html",
+    "https://www.oracle.com/security-alerts/cspunov2026verbose.html"
+  ],
+  "scope_note": "Only versions explicitly listed by KISA and Oracle are marked affected. OpenJDK-derived distributions require their own vendor advisory.",
+  "advisories": [
+    {
+      "cve_id": "CVE-2026-86144",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle JavaFX"],
+      "component": "JavaFX (libxml2)",
+      "description_ko": "Oracle Java SE 및 Oracle JavaFX의 libxml2에서 발생하는 XXE 주입 및 SSRF 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u511b33"]},
+        {"product": "Oracle JavaFX", "versions": ["21.0.13", "25.0.5", "27.0.1"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u513", "1.8.0_513-b04"]},
+        {"product": "Oracle JavaFX", "versions": ["21.0.13.1", "25.0.5.1", "27.0.1.1"]}
+      ],
+      "affected_builds": ["8u511b33", "21.0.13", "25.0.5", "27.0.1"],
+      "applicable_conditions": [
+        "Difficult to exploit; network access via multiple protocols and human interaction are required.",
+        "Applies to sandboxed Java Web Start/applets loading untrusted code; Oracle states it does not apply to trusted-code-only server deployments."
+      ],
+      "exploitability": "공격자 네트워크 접근과 제3자의 상호작용이 필요하며, 신뢰하지 않는 코드를 실행하는 샌드박스형 클라이언트 배포 조건이 적용된다.",
+      "severity": "HIGH",
+      "cvss_score": 7.5,
+      "advisory_urls": [
+        "https://www.oracle.com/security-alerts/cspunov2026.html",
+        "https://www.oracle.com/security-alerts/cspunov2026verbose.html",
+        "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"
+      ],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 130-133", "Oracle verbose risk matrix lines 1653-1657"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "KISA가 제시한 해결 버전으로 업데이트하고 실제 배포 조건을 별도로 확인하십시오."
+    },
+    {
+      "cve_id": "CVE-2026-114938",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle GraalVM for JDK", "Oracle GraalVM Enterprise Edition"],
+      "component": "Compiler",
+      "description_ko": "Oracle Java SE Compiler에서 발생하는 Heap-based Buffer Overflow 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u511b33-perf", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.0.3", "21.0.13.0.3"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.0.3"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u513", "1.8.0_513-b04", "17.0.21.1", "21.0.13.1", "25.0.5.1", "27.0.1.1"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.1", "21.0.13.1"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.1"]}
+      ],
+      "affected_builds": ["8u511b33-perf", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3", "21.3.20.0.3"],
+      "applicable_conditions": [
+        "Difficult to exploit; unauthenticated network access via multiple protocols.",
+        "Exploitation requires supplying data to APIs in the Compiler component."
+      ],
+      "exploitability": "Compiler API로 공격자 제어 데이터가 전달되어야 하며 실제 도달 가능성은 별도 확인 대상이다.",
+      "severity": "HIGH",
+      "cvss_score": 8.1,
+      "advisory_urls": [
+        "https://www.oracle.com/security-alerts/cspunov2026.html",
+        "https://www.oracle.com/security-alerts/cspunov2026verbose.html",
+        "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"
+      ],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 134-141", "Oracle verbose risk matrix lines 1610-1613"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "제품별 KISA 해결 빌드로 업데이트하고, OpenJDK 계열은 해당 배포판 공지를 확인하십시오."
+    },
+    {
+      "cve_id": "CVE-2026-114939",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle GraalVM for JDK", "Oracle GraalVM Enterprise Edition"],
+      "component": "JGSS",
+      "description_ko": "Oracle Java SE JGSS에서 발생하는 정보 노출 및 데이터 변조 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u511b33", "8u511b33-perf", "11.0.33.0.3", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.0.3", "21.0.13.0.3"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.0.3"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u513", "1.8.0_513-b04", "11.0.33.1", "17.0.21.1", "21.0.13.1", "25.0.5.1", "27.0.1.1"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.1", "21.0.13.1"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.1"]}
+      ],
+      "affected_builds": ["8u511b33", "8u511b33-perf", "11.0.33.0.3", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3", "21.3.20.0.3"],
+      "applicable_conditions": [
+        "Difficult to exploit; unauthenticated network access via multiple protocols.",
+        "Applies to sandboxed Java Web Start/applets loading untrusted code; not trusted-code-only server deployments."
+      ],
+      "exploitability": "신뢰하지 않는 코드를 실행하는 샌드박스형 클라이언트 배포 조건이 적용된다.",
+      "severity": "HIGH",
+      "cvss_score": 7.4,
+      "advisory_urls": ["https://www.oracle.com/security-alerts/cspunov2026verbose.html", "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 142-151", "Oracle verbose risk matrix lines 1614-1618"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "제품별 KISA 해결 빌드로 업데이트하고 배포 신뢰 모델을 확인하십시오."
+    },
+    {
+      "cve_id": "CVE-2026-114940",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle GraalVM for JDK", "Oracle GraalVM Enterprise Edition"],
+      "component": "JSSE",
+      "description_ko": "Oracle Java SE JSSE에서 발생하는 정보 노출 및 데이터 변조 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u511b33", "8u511b33-perf", "11.0.33.0.3", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.0.3", "21.0.13.0.3"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.0.3"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["8u513", "1.8.0_513-b04", "11.0.33.1", "17.0.21.1", "21.0.13.1", "25.0.5.1", "27.0.1.1"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["17.0.21.1", "21.0.13.1"]},
+        {"product": "Oracle GraalVM Enterprise Edition", "versions": ["21.3.20.1"]}
+      ],
+      "affected_builds": ["8u511b33", "8u511b33-perf", "11.0.33.0.3", "17.0.21.0.3", "21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3", "21.3.20.0.3"],
+      "applicable_conditions": ["Difficult to exploit; unauthenticated network access via TLS.", "JSSE APIs must receive attacker-controlled data; sandboxed untrusted-code deployments are also in scope."],
+      "exploitability": "TLS 또는 JSSE API로 공격자 제어 데이터가 도달하는지 별도 확인해야 한다.",
+      "severity": "HIGH",
+      "cvss_score": 7.4,
+      "advisory_urls": ["https://www.oracle.com/security-alerts/cspunov2026verbose.html", "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 152-161", "Oracle verbose risk matrix lines 1619-1623"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "제품별 KISA 해결 빌드로 업데이트하고 TLS 입력 경로를 점검하십시오."
+    },
+    {
+      "cve_id": "CVE-2026-114941",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle GraalVM for JDK"],
+      "component": "Compiler",
+      "description_ko": "Oracle Java SE Compiler에서 발생하는 서비스 거부 및 데이터 변조 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["21.0.13.0.3"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["21.0.13.1", "25.0.5.1", "27.0.1.1"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["21.0.13.1"]}
+      ],
+      "affected_builds": ["21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"],
+      "applicable_conditions": ["Difficult to exploit; unauthenticated network access via multiple protocols.", "Compiler APIs must receive attacker-controlled data."],
+      "exploitability": "Compiler API로 공격자 제어 데이터가 전달되어야 한다.",
+      "severity": "HIGH",
+      "cvss_score": 7.0,
+      "advisory_urls": ["https://www.oracle.com/security-alerts/cspunov2026verbose.html", "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 162-165", "Oracle verbose risk matrix lines 1624-1627"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "제품별 KISA 해결 빌드로 업데이트하고 Compiler API 입력 경로를 점검하십시오."
+    },
+    {
+      "cve_id": "CVE-2026-114942",
+      "vendor": "Oracle",
+      "product": ["Oracle Java SE", "Oracle GraalVM for JDK"],
+      "component": "Libraries",
+      "description_ko": "Oracle Java SE Libraries에서 발생하는 서비스 거부 및 데이터 변조 취약점",
+      "affected_versions": [
+        {"product": "Oracle Java SE", "versions": ["21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["21.0.13.0.3"]}
+      ],
+      "fixed_versions": [
+        {"product": "Oracle Java SE", "versions": ["21.0.13.1", "25.0.5.1", "27.0.1.1"]},
+        {"product": "Oracle GraalVM for JDK", "versions": ["21.0.13.1"]}
+      ],
+      "affected_builds": ["21.0.13.0.3", "25.0.5.0.3", "27.0.1.0.3"],
+      "applicable_conditions": ["Difficult to exploit; unauthenticated network access via multiple protocols.", "Library APIs must receive attacker-controlled data."],
+      "exploitability": "Libraries API로 공격자 제어 데이터가 전달되어야 한다.",
+      "severity": "HIGH",
+      "cvss_score": 7.0,
+      "advisory_urls": ["https://www.oracle.com/security-alerts/cspunov2026verbose.html", "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72313"],
+      "published_date": "2026-11-17",
+      "updated_date": "2026-11-18",
+      "evidence_source": ["KISA table rows 166-169", "Oracle verbose risk matrix lines 1628-1631"],
+      "verification_status": "VERIFIED_OFFICIAL",
+      "recommendation": "제품별 KISA 해결 빌드로 업데이트하고 Libraries API 입력 경로를 점검하십시오."
+    }
+  ]
+}
