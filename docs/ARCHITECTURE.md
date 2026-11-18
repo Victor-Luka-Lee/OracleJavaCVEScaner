@@ -19,6 +19,8 @@ Bounded Discovery ── release/레지스트리/패키지 근거 ──▶ Asse
                                            CLI / Streamlit / Reports
 ```
 
+인자 없는 실행에서는 `autorun`이 환경 확인과 보고서 경로 예약을 담당한 뒤 동일한 `workflow`를 호출합니다. `workflow`는 CLI, Streamlit, 자동 모드가 공유하는 `Discovery → Evaluation → ScanReport` 경로입니다.
+
 ## 모듈 경계
 
 - `discovery`: 운영체제별 후보 루트를 만들고 제한된 DFS를 수행합니다. 파일/메타데이터를 읽어 `Asset`만 반환하며 CVE를 알지 못합니다.
@@ -26,6 +28,8 @@ Bounded Discovery ── release/레지스트리/패키지 근거 ──▶ Asse
 - `advisory`: 외부 입력인 JSON을 UTF-8로 읽고, 선택적으로 SHA-256을 확인한 뒤 필수 필드와 중복/검증 상태를 검사합니다.
 - `engine`: 하나의 자산과 하나의 CVE를 독립 평가합니다. 공급업체, 제품, 변형, 정확한 영향 버전, 해결 버전 순서로 근거를 좁힙니다.
 - `reporting`: 도메인 객체를 직렬화합니다. CSV 수식 주입과 HTML 주입을 방어하며 네트워크 없는 단일 HTML을 만듭니다.
+- `workflow`: 탐색, 판정, 보고서 모델 조립을 한 번만 구현하고 CLI/UI/자동 모드가 공유합니다. 제한 도달과 접근 오류를 `incomplete` 및 `limit_reasons`로 보존합니다.
+- `autorun`: 인자 없는 무인 실행, 안전한 호스트명/파일명, 실행 위치→사용자 상태 폴더 폴백, 파일 예약, 진행/오류 로그와 자동 모드 종료 코드를 담당합니다.
 - `cli`, `ui`: 입력과 표현만 담당합니다. UI 탐색은 백그라운드 스레드와 중단 이벤트를 사용합니다.
 
 ## 신뢰 경계

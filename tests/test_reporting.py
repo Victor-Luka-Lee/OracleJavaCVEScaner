@@ -41,3 +41,15 @@ def test_report_escapes_paths_and_csv_formulas(database, asset_factory):
     assert "<script>alert" not in html_report(report)
     assert "'=cmd" in csv_report(report)
 
+
+def test_csv_includes_scan_errors_and_incomplete_reason(database, asset_factory):
+    report = _report(database, asset_factory("21.0.13.0.3"))
+    report.errors.append("권한 오류 fixture")
+    report.scope["incomplete"] = True
+    report.scope["limit_reasons"] = ["timeout"]
+    output = csv_report(report)
+    assert "SCAN_ERROR" in output
+    assert "권한 오류 fixture" in output
+    assert "SCAN_INCOMPLETE" in output
+    assert "timeout" in output
+

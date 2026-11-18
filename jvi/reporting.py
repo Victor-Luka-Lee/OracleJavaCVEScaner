@@ -65,6 +65,23 @@ def csv_report(report: ScanReport) -> str:
                 "database_version": finding.database_version,
             }
         )
+    for error in report.errors:
+        writer.writerow(
+            {
+                "status": "SCAN_ERROR",
+                "rationale": _csv_safe(error),
+                "database_version": report.database_version,
+            }
+        )
+    if report.scope.get("incomplete"):
+        reasons = ", ".join(report.scope.get("limit_reasons") or ["access_errors"])
+        writer.writerow(
+            {
+                "status": "SCAN_INCOMPLETE",
+                "rationale": _csv_safe(f"일부 점검 미완료: {reasons}"),
+                "database_version": report.database_version,
+            }
+        )
     return output.getvalue()
 
 
@@ -141,12 +158,19 @@ def render(report: ScanReport, format_name: str) -> str:
     raise ValueError(f"unsupported report format: {format_name}")
 
 
-def write_report(report: ScanReport, format_name: str, output: str | Path) -> Path:
+def write_report(
+    report: ScanReport,
+    format_name: str,
+    output: str | Path,
+    *,
+    overwrite: bool = True,
+) -> Path:
     path = Path(output)
     if path.is_dir():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         path = path / f"jvi-{stamp}.{format_name}"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render(report, format_name), encoding="utf-8", newline="")
+    with path.open("w" if overwrite else "x", encoding="utf-8", newline="") as handle:
+        handle.write(render(report, format_name))
     return path
 

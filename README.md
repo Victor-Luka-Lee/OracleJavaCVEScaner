@@ -35,6 +35,37 @@ uv sync --extra dev
 uv run pytest
 ```
 
+## 원클릭 자동 점검
+
+설치 후 인자 없이 실행하면 사용자 입력 없이 extended 점검, CVE 평가, 보고서 저장, 한국어 요약까지 수행합니다.
+
+```bash
+python -m jvi
+jvi
+```
+
+자동 점검은 `max-depth=7`, `max-files=100000`, `timeout=180초`, 심볼릭 링크 추적 비활성화, Java 실행 비활성화, 패키지 메타데이터 조회 활성화로 고정됩니다. 시스템 전체 디스크를 무제한 탐색하지 않습니다. 제한 또는 접근 오류가 발생하면 보고서와 콘솔에 `일부 점검 미완료`가 표시됩니다.
+
+HTML, JSON, CSV, 실행 로그는 다음 우선순위에 따라 자동 저장됩니다.
+
+1. 실행 파일 위치(모듈 실행 시 현재 디렉터리)의 `reports`
+2. Windows: `%LOCALAPPDATA%\JVI\reports`
+3. Linux: `$XDG_STATE_HOME/JVI/reports` 또는 `~/.local/state/JVI/reports`
+
+파일명은 `JVI_HOSTNAME_YYYYMMDD_HHMMSS.*`이며 안전하게 정규화됩니다. 같은 이름이 있으면 `_01`, `_02`를 붙이고 기존 보고서를 덮어쓰지 않습니다.
+
+자동 모드 종료 코드는 다음과 같습니다. 기존 `scan` 명령의 종료 동작은 변경하지 않았습니다.
+
+| 코드 | 의미 |
+|---:|---|
+| 0 | 전체 점검 완료, `AFFECTED` 없음 |
+| 1 | 전체 점검 완료, `AFFECTED` 발견 |
+| 2 | DB·보고서·예기치 않은 치명적 오류 |
+| 3 | 일부 점검 미완료, `AFFECTED` 없음 |
+| 4 | 일부 점검 미완료이며 `AFFECTED` 발견 |
+
+Windows Explorer에서 콘솔 프로세스의 시작 주체를 완전히 신뢰성 있게 판별하기 어렵기 때문에 Python 본체는 입력 대기 없이 종료합니다. 더블클릭용 [JVI-OneClick.cmd](JVI-OneClick.cmd)는 같은 폴더의 `JVI.exe`를 우선 실행하고, 아직 exe가 없으면 `python -m jvi`를 실행한 뒤 Enter 입력까지 창을 유지합니다. PowerShell/CMD 및 Linux/SSH에서는 일반 `jvi` 또는 `python -m jvi`를 사용하면 불필요한 대기 없이 종료됩니다. 웹브라우저 실행이나 관리자 권한 상승은 수행하지 않습니다.
+
 ## CLI 사용법
 
 ```bash
@@ -100,10 +131,12 @@ Windows에서는 `PATH`, `JAVA_HOME`, `Program Files`, `Program Files (x86)`, �
 ```text
 jvi/
   advisory.py   공식 JSON 로드, 스키마 및 SHA-256 검증
+  autorun.py     무인 자동 점검, 보고서 경로 폴백, 종료 코드
   discovery.py  제한 기반 자산 탐색, 공급업체/제품 식별
   version.py    Java 버전 정규화와 비교
   engine.py     CVE별 독립 판정
   reporting.py  JSON/CSV/자급식 HTML 보고서
+  workflow.py   CLI/UI/자동 모드 공통 점검 워크플로
   cli.py        argparse CLI
   ui.py         한국어 Streamlit UI와 백그라운드 중단 처리
 data/advisories/oracle_2026_11.json
@@ -118,7 +151,7 @@ tests/          가상 release fixture 기반 pytest
 pytest
 ```
 
-테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. Java 8 update/build, 현대 버전 비교, perf 변형, Oracle/OpenJDK 구분, 공식 영향·해결 빌드, 동일 update의 다른 build, 세부 build 누락, 목록에 없는 구버전, 지원 종료 메타데이터, 불명확한 공급업체, 변경 전후 회귀 행렬, 다중 설치, 링크 순환, 권한 오류, Java 미설치, JSON/CSV/HTML 생성 및 DB 무결성 거부를 다룹니다.
+테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. 기존 판정 회귀 테스트와 함께 인자 없는 실행, 기존 CLI 파싱, 자동 범위 제한, Java 미설치/다중 설치, timeout, 보고서 4종, 저장 경로 폴백/권한 실패, DB 오류, Windows/Linux 상태 경로, 한글 콘솔, 예외 로깅, 파일명 충돌을 검증합니다.
 
 ## 보안 특성
 
@@ -147,4 +180,5 @@ pytest
 - Windows Store/MSI 전체 인벤토리와 Linux 컨테이너 패키지 DB는 별도 수집하지 않습니다.
 - OpenJDK 벤더별 2026년 11월 공지는 이 검증 데이터 세트에 포함하지 않았으므로 `NOT_ASSESSED`로 두며 수정 여부를 추정하지 않습니다.
 - 공식 공지의 버전 판정과 실제 애플리케이션 입력 경로·CPU 특성·샌드박스 조건 검증은 별개입니다.
+- PyInstaller 독립 실행 파일 빌드는 이번 단계에 포함하지 않았으며 다음 패키징 단계에서 `JVI.exe`로 생성합니다.
 

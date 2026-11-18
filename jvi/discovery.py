@@ -38,6 +38,8 @@ class DiscoveryResult:
     errors: list[str]
     examined_entries: int
     stopped: bool
+    incomplete: bool
+    limit_reasons: list[str]
     roots: list[str]
 
 
@@ -335,17 +337,22 @@ def discover(
     homes_seen: set[str] = set()
     dirs_seen: set[tuple[int, int] | str] = set()
     stopped = False
+    limit_reasons: set[str] = set()
 
-    def limits_hit() -> bool:
-        return (
-            stop_event.is_set()
-            or examined >= config.max_files
-            or time.monotonic() - start >= config.timeout_seconds
-        )
+    def limit_reason() -> str | None:
+        if stop_event.is_set():
+            return "stop_requested"
+        if examined >= config.max_files:
+            return "max_files"
+        if time.monotonic() - start >= config.timeout_seconds:
+            return "timeout"
+        return None
 
     stack: list[tuple[Path, int]] = [(root, 0) for root in reversed(roots)]
     while stack:
-        if limits_hit():
+        reason = limit_reason()
+        if reason:
+            limit_reasons.add(reason)
             stopped = True
             break
         directory, depth = stack.pop()
@@ -383,6 +390,7 @@ def discover(
         if progress:
             progress(examined, str(directory))
         if depth >= config.max_depth:
+            limit_reasons.add("max_depth")
             continue
         try:
             with os.scandir(directory) as iterator:
@@ -392,7 +400,9 @@ def discover(
             continue
         for entry in entries:
             examined += 1
-            if limits_hit():
+            reason = limit_reason()
+            if reason:
+                limit_reasons.add(reason)
                 stopped = True
                 break
             try:
@@ -426,6 +436,8 @@ def discover(
         errors=errors,
         examined_entries=examined,
         stopped=stopped,
+        incomplete=bool(limit_reasons or errors),
+        limit_reasons=sorted(limit_reasons),
         roots=[str(root) for root in roots],
     )
 

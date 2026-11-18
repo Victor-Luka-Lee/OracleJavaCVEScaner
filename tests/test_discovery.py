@@ -106,10 +106,28 @@ def test_permission_error_is_recorded_and_scan_continues(tmp_path, monkeypatch):
     result = discover(ScanConfig(roots=[tmp_path], max_depth=2, collect_package_info=False))
     assert len(result.assets) == 1
     assert any("PermissionError" in error for error in result.errors)
+    assert result.incomplete is True
 
 
 def test_java_absent_returns_empty_result(tmp_path):
     (tmp_path / "ordinary.txt").write_text("not java", encoding="utf-8")
     result = discover(ScanConfig(roots=[tmp_path], max_depth=2, collect_package_info=False))
     assert result.assets == []
+
+
+def test_timeout_marks_scan_incomplete(tmp_path, monkeypatch):
+    (tmp_path / "directory").mkdir()
+    ticks = iter([0.0, 1.0])
+    monkeypatch.setattr("jvi.discovery.time.monotonic", lambda: next(ticks, 1.0))
+    result = discover(
+        ScanConfig(
+            roots=[tmp_path],
+            max_depth=7,
+            timeout_seconds=0.5,
+            collect_package_info=False,
+        )
+    )
+    assert result.stopped is True
+    assert result.incomplete is True
+    assert "timeout" in result.limit_reasons
 

@@ -3,25 +3,27 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import json
 import logging
 from pathlib import Path
 import sys
 from typing import Sequence
 
 from .advisory import AdvisoryDataError, DEFAULT_ADVISORY, load_database
-from .discovery import ScanConfig, discover, environment_summary
-from .engine import evaluate_assets
+from .discovery import ScanConfig
 from .models import ScanReport, Status
 from .reporting import DISCLAIMER, render, write_report
+from .workflow import execute_scan
 
 
 LOG = logging.getLogger("jvi")
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="jvi", description="Java Vulnerability Inspector")
+    parser = argparse.ArgumentParser(
+        prog="jvi",
+        description="Java Vulnerability Inspector",
+        epilog="인자 없이 실행하면 제한된 extended 자동 점검과 보고서 저장을 수행합니다.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     scan = subparsers.add_parser("scan", help="로컬 Java 자산을 읽기 전용으로 점검")
     modes = scan.add_mutually_exclusive_group()
@@ -67,38 +69,10 @@ def build_report(args: argparse.Namespace) -> ScanReport:
         allow_java_execution=args.allow_java_execution,
         collect_package_info=not args.no_package_info,
     )
-    result = discover(config, progress=lambda count, path: LOG.debug("examined=%s path=%s", count, path))
-    findings = evaluate_assets(result.assets, database)
-    limitations = [
-        DISCLAIMER,
-        "Oracle 공지에 명시된 정확한 제품/빌드만 영향 범위로 사용하며 이전 버전을 임의 확장하지 않습니다.",
-        "공식 영향·해결 목록에 없는 버전은 안전으로 간주하지 않고 NOT_ASSESSED로 분류합니다.",
-        "OpenJDK 계열은 배포판별 공식 수정 공지가 이 DB에 없으면 NOT_ASSESSED입니다.",
-        "기본 점검은 release 파일과 로컬 메타데이터를 사용하며 Java 바이너리를 실행하지 않습니다.",
-        "내장 런타임은 설정한 깊이·파일 수·시간 제한 안에서만 발견됩니다.",
-    ]
-    if result.stopped:
-        limitations.append("사용자 중단 또는 탐색 제한 도달로 점검이 조기에 종료되었습니다.")
-    return ScanReport(
-        scan_time=datetime.now(timezone.utc).isoformat(),
-        environment=environment_summary(),
-        scope={
-            "mode": mode,
-            "roots": result.roots,
-            "max_depth": config.max_depth,
-            "max_files": config.max_files,
-            "timeout_seconds": config.timeout_seconds,
-            "follow_symlinks": config.follow_symlinks,
-            "java_execution_enabled": config.allow_java_execution,
-            "examined_entries": result.examined_entries,
-            "stopped": result.stopped,
-        },
-        assets=result.assets,
-        findings=findings,
-        database_version=database["database_version"],
-        sources=database["sources"],
-        limitations=limitations,
-        errors=result.errors,
+    return execute_scan(
+        config,
+        database,
+        progress=lambda count, path: LOG.debug("examined=%s path=%s", count, path),
     )
 
 
@@ -146,8 +120,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure:
             reconfigure(encoding="utf-8", errors="replace")
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
+    if not effective_argv:
+        from .autorun import run_automatic_scan
+
+        return run_automatic_scan()
     parser = _parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(effective_argv)
     _validate_args(args, parser)
     if args.command == "ui":
         return _run_ui()

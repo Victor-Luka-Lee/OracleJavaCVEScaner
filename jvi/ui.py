@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import time
@@ -12,10 +11,10 @@ from typing import Any
 import streamlit as st
 
 from jvi.advisory import load_database
-from jvi.discovery import ScanConfig, discover, environment_summary
-from jvi.engine import evaluate_assets
+from jvi.discovery import ScanConfig
 from jvi.models import ScanReport, Status
 from jvi.reporting import DISCLAIMER, csv_report, html_report, json_report
+from jvi.workflow import execute_scan
 
 
 @dataclass
@@ -36,36 +35,11 @@ def _run_job(job: ScanJob) -> None:
             job.examined = count
             job.current_path = path
 
-        result = discover(job.config, stop_event=job.stop_event, progress=progress)
-        findings = evaluate_assets(result.assets, job.database)
-        limitations = [
-            DISCLAIMER,
-            "Oracle 공지에서 명시한 정확한 빌드만 영향 대상으로 판정합니다.",
-            "공식 영향·해결 목록에 없는 버전은 NOT_ASSESSED로 판정합니다.",
-            "OpenJDK 계열은 배포판별 수정 공지가 DB에 없어 NOT_ASSESSED로 판정합니다.",
-            "탐색 제한 밖의 애플리케이션 내장 런타임은 발견되지 않을 수 있습니다.",
-        ]
-        if result.stopped:
-            limitations.append("중단 요청 또는 탐색 제한 도달로 점검이 조기에 끝났습니다.")
-        job.report = ScanReport(
-            scan_time=datetime.now(timezone.utc).isoformat(),
-            environment=environment_summary(),
-            scope={
-                "mode": job.config.mode,
-                "roots": result.roots,
-                "max_depth": job.config.max_depth,
-                "max_files": job.config.max_files,
-                "timeout_seconds": job.config.timeout_seconds,
-                "examined_entries": result.examined_entries,
-                "stopped": result.stopped,
-                "java_execution_enabled": job.config.allow_java_execution,
-            },
-            assets=result.assets,
-            findings=findings,
-            database_version=job.database["database_version"],
-            sources=job.database["sources"],
-            limitations=limitations,
-            errors=result.errors,
+        job.report = execute_scan(
+            job.config,
+            job.database,
+            stop_event=job.stop_event,
+            progress=progress,
         )
     except Exception as exc:  # surfaced in the local UI without a remote error service
         job.error = f"{exc.__class__.__name__}: {exc}"
