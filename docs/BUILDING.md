@@ -75,6 +75,17 @@ SHA-256은 내용 변조/손상을 탐지하는 체크섬입니다. 비밀키로
 
 `.github/workflows/build-release.yml`은 수동 실행과 `v*` 태그 push를 지원합니다. Windows와 Linux를 각 대상 환경에서 별도로 빌드하며, 테스트와 smoke test를 통과한 산출물만 Artifact로 올립니다. 태그 작업에서는 두 빌드가 모두 성공한 뒤 통합 `SHA256SUMS.txt`를 만들고 해당 태그의 GitHub Release에 첨부합니다. 워크플로는 소스나 태그를 자동으로 push하지 않습니다.
 
+Linux만 독립적으로 빌드할 때는 `.github/workflows/build-linux.yml`의 **Build Linux standalone** 워크플로를 사용합니다. `workflow_dispatch` 전용이고 `contents: read` 권한만 사용하며 Secret이 필요하지 않습니다. `/opt/python/cp312-cp312/bin/python`의 Python 3.12와 x86-64를 먼저 확인한 뒤 `packaging/build_linux.sh`를 한 번 호출합니다. 스크립트가 pytest, 두 PyInstaller 형식, ELF/ldd, smoke test, 압축 및 SHA-256을 모두 통과해야 `jvi-linux-x64` Artifact가 업로드됩니다.
+
+```bash
+gh workflow run build-linux.yml --ref main
+gh run list --workflow build-linux.yml
+gh run view RUN_ID --log
+gh run download RUN_ID --name jvi-linux-x64
+```
+
+Artifact에는 `JVI-Linux-x64.tar.gz`, `JVI-Linux-x64-onedir.tar.gz`, `SHA256SUMS-Linux.txt`, `JVI-Linux-x64.file.txt`, `JVI-Linux-x64.ldd.txt`가 포함됩니다. 워크플로가 실패하면 `if-no-files-found: error` 및 작업 실패 상태를 유지하며 배포 성공으로 처리하지 않습니다.
+
 ## smoke test가 확인하는 항목
 
 - PE/ELF 파일 형식과 `--help`

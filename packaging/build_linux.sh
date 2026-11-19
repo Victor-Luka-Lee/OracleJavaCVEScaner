@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+report_failure() {
+  status=$?
+  trap - ERR
+  echo "Linux build failed at line ${BASH_LINENO[0]} (exit $status)." >&2
+  exit "$status"
+}
+trap report_failure ERR
+
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python_bin="${JVI_PYTHON:-python3.12}"
 dist_root="$project_root/dist"
@@ -12,7 +20,7 @@ echo "[1/9] Python, 아키텍처 및 glibc 확인"
 python_version="$($python_bin -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
 [[ "$python_version" == 3.12.* ]] || { echo "검증된 Python 3.12.x가 필요합니다: $python_version" >&2; exit 2; }
 [[ "$(uname -m)" == "x86_64" ]] || { echo "Linux x86-64 빌드만 지원합니다." >&2; exit 2; }
-ldd --version | head -n 1
+ldd --version 2>&1 | sed -n '1p'
 
 echo "[2/9] 격리된 빌드 환경 준비"
 "$python_bin" -m venv --clear "$venv_root"
@@ -49,7 +57,15 @@ test -x "$dist_root/jvi-onedir/jvi"
 
 echo "[7/9] ELF, 동적 라이브러리 및 smoke test"
 file "$dist_root/jvi" | tee "$dist_root/JVI-Linux-x64.file.txt"
+grep -Eq 'ELF 64-bit.*x86-64' "$dist_root/JVI-Linux-x64.file.txt" || {
+  echo "one-file 산출물이 Linux x86-64 ELF가 아닙니다." >&2
+  exit 2
+}
 ldd "$dist_root/jvi" | tee "$dist_root/JVI-Linux-x64.ldd.txt"
+if grep -q 'not found' "$dist_root/JVI-Linux-x64.ldd.txt"; then
+  echo "해결되지 않은 공유 라이브러리 의존성이 있습니다." >&2
+  exit 2
+fi
 "$venv_python" "$project_root/scripts/smoke_test.py" "$dist_root/jvi" \
   --peer "$dist_root/jvi-onedir/jvi" \
   --project-root "$project_root" \
@@ -76,6 +92,7 @@ echo "[9/9] SHA-256 및 결과 요약"
 (
   cd "$dist_root"
   sha256sum "$(basename "$onefile_archive")" "$(basename "$onedir_archive")" > SHA256SUMS-Linux.txt
+  sha256sum --check SHA256SUMS-Linux.txt
 )
 echo "PyInstaller: $($venv_python -m PyInstaller --version)"
 echo "One-file: $dist_root/jvi"

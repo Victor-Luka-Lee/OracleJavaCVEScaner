@@ -175,6 +175,13 @@ JVI_PYTHON=python3.12 bash packaging/build_linux.sh
 
 빌드 스크립트는 테스트, PyInstaller 6.11.1 빌드, 고립 환경 smoke test, 원본/one-file/one-folder 판정 비교, 압축과 SHA-256 생성을 연속 수행합니다. GitHub Actions는 수동 실행과 `v*` 태그를 지원하며 테스트가 성공한 산출물만 Artifact/태그 릴리스로 전달합니다.
 
+Windows에서 Linux 빌드만 요청하려면 GitHub Actions의 **Build Linux standalone** 워크플로를 수동 실행합니다. 이 워크플로는 별도 Secret 없이 `ubuntu-22.04`의 공식 manylinux 2.28 컨테이너에서 기존 `packaging/build_linux.sh`를 호출하고, 성공한 경우에만 `jvi-linux-x64` Artifact를 업로드합니다.
+
+```bash
+gh workflow run build-linux.yml --ref main
+gh run list --workflow build-linux.yml
+```
+
 자세한 산출물 경로, glibc 2.28 기준선, `/tmp noexec` 대안, 플랫폼별 검증 상태는 [독립 실행형 빌드 및 배포 매뉴얼](docs/BUILDING.md)을 참고하십시오.
 
 ## 테스트

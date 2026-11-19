@@ -40,6 +40,7 @@ def test_build_automation_and_release_workflow_exist():
         "packaging/build_linux.sh",
         "scripts/smoke_test.py",
         ".github/workflows/build-release.yml",
+        ".github/workflows/build-linux.yml",
         "docs/BUILDING.md",
     ]
     assert all((PROJECT_ROOT / item).is_file() for item in required)
@@ -48,6 +49,30 @@ def test_build_automation_and_release_workflow_exist():
     assert 'tags:' in workflow
     assert "JVI-Windows-x64.zip" in workflow
     assert "JVI-Linux-x64-onedir.tar.gz" in workflow
+
+
+def test_linux_only_workflow_reuses_build_script_and_uploads_required_artifacts():
+    workflow = (PROJECT_ROOT / ".github/workflows/build-linux.yml").read_text(encoding="utf-8")
+    assert "name: Build Linux standalone" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "runs-on: ubuntu-22.04" in workflow
+    assert "quay.io/pypa/manylinux_2_28_x86_64:latest" in workflow
+    assert "JVI_PYTHON: /opt/python/cp312-cp312/bin/python" in workflow
+    assert "bash packaging/build_linux.sh" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "name: jvi-linux-x64" in workflow
+    assert "contents: read" in workflow
+    assert "if-no-files-found: error" in workflow
+    assert "secrets." not in workflow
+    for artifact in (
+        "JVI-Linux-x64.tar.gz",
+        "JVI-Linux-x64-onedir.tar.gz",
+        "SHA256SUMS-Linux.txt",
+        "JVI-Linux-x64.file.txt",
+        "JVI-Linux-x64.ldd.txt",
+    ):
+        assert artifact in workflow
+    assert "windows-x64" not in workflow
 
 
 def test_windows_launcher_prefers_exe_and_preserves_exit_code():

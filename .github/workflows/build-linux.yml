@@ -1,0 +1,64 @@
+name: Build Linux standalone
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x64:
+    name: Linux x86-64 standalone
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64:latest
+    env:
+      JVI_PYTHON: /opt/python/cp312-cp312/bin/python
+      PYTHONUTF8: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Linux build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$JVI_PYTHON"
+          "$JVI_PYTHON" -c 'import platform, sys; assert sys.version_info[:2] == (3, 12); print(sys.version); print(platform.machine())'
+          test "$(uname -m)" = "x86_64"
+          ldd --version 2>&1 | sed -n '1p'
+
+      - name: Build, test and package Linux x86-64
+        shell: bash
+        run: bash packaging/build_linux.sh
+
+      - name: Verify required release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x dist/jvi
+          test -x dist/jvi-onedir/jvi
+          for artifact in \
+            JVI-Linux-x64.tar.gz \
+            JVI-Linux-x64-onedir.tar.gz \
+            SHA256SUMS-Linux.txt \
+            JVI-Linux-x64.file.txt \
+            JVI-Linux-x64.ldd.txt; do
+            test -s "dist/$artifact"
+          done
+          (cd dist && sha256sum --check SHA256SUMS-Linux.txt)
+          tar -tzf dist/JVI-Linux-x64.tar.gz >/dev/null
+          tar -tzf dist/JVI-Linux-x64-onedir.tar.gz >/dev/null
+
+      - name: Upload Linux release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jvi-linux-x64
+          if-no-files-found: error
+          path: |
+            dist/JVI-Linux-x64.tar.gz
+            dist/JVI-Linux-x64-onedir.tar.gz
+            dist/SHA256SUMS-Linux.txt
+            dist/JVI-Linux-x64.file.txt
+            dist/JVI-Linux-x64.ldd.txt
