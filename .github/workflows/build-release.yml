@@ -1,0 +1,89 @@
+name: Build standalone release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.8"
+          architecture: "x64"
+      - name: Build, test and package Windows x64
+        shell: pwsh
+        run: ./packaging/build_windows.ps1 -Python python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jvi-windows-x64
+          if-no-files-found: error
+          path: |
+            dist/JVI-Windows-x64.zip
+            dist/JVI-Windows-x64-onedir.zip
+            dist/SHA256SUMS-Windows.txt
+
+  linux-x64:
+    runs-on: ubuntu-22.04
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, test and package Linux x86-64
+        shell: bash
+        env:
+          JVI_PYTHON: /opt/python/cp312-cp312/bin/python
+        run: bash packaging/build_linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jvi-linux-x64
+          if-no-files-found: error
+          path: |
+            dist/JVI-Linux-x64.tar.gz
+            dist/JVI-Linux-x64-onedir.tar.gz
+            dist/JVI-Linux-x64.file.txt
+            dist/JVI-Linux-x64.ldd.txt
+            dist/SHA256SUMS-Linux.txt
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-x64, linux-x64]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: jvi-*
+          path: release
+          merge-multiple: true
+      - name: Generate combined SHA-256 manifest
+        shell: bash
+        run: |
+          cd release
+          sha256sum JVI-Windows-x64.zip JVI-Windows-x64-onedir.zip \
+            JVI-Linux-x64.tar.gz JVI-Linux-x64-onedir.tar.gz > SHA256SUMS.txt
+      - name: Attach tested artifacts to tag release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=(
+            release/JVI-Windows-x64.zip
+            release/JVI-Windows-x64-onedir.zip
+            release/JVI-Linux-x64.tar.gz
+            release/JVI-Linux-x64-onedir.tar.gz
+            release/SHA256SUMS.txt
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --generate-notes --verify-tag
+          fi

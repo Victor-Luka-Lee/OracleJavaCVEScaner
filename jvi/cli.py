@@ -106,7 +106,11 @@ def _run_ui() -> int:
     try:
         from streamlit.web import cli as stcli
     except ImportError:
-        print("Streamlit이 설치되지 않았습니다. `python -m pip install -e .` 후 다시 실행하십시오.", file=sys.stderr)
+        print(
+            "이 서버용 CLI 빌드에는 Streamlit UI가 포함되지 않습니다. "
+            "Python 소스 환경에서는 `python -m pip install -e \".[ui]\"`로 설치하십시오.",
+            file=sys.stderr,
+        )
         return 2
     ui_path = Path(__file__).with_name("ui.py")
     sys.argv = ["streamlit", "run", str(ui_path)]

@@ -173,6 +173,35 @@ def html_report(report: ScanReport) -> str:
     advisories = _advisory_index(report)
     incomplete = bool(report.scope.get("incomplete") or report.errors)
     result_label = "일부 점검 미완료" if incomplete else "점검 완료"
+    structured_issues = [
+        item for item in (report.scope.get("issues") or []) if isinstance(item, dict)
+    ]
+    skipped_paths = [
+        item for item in (report.scope.get("skipped_paths") or []) if isinstance(item, dict)
+    ]
+    root_links = [
+        item for item in (report.scope.get("root_links") or []) if isinstance(item, dict)
+    ]
+    issue_counts = report.scope.get("issue_counts") or {}
+    permission_issues = [
+        item
+        for item in structured_issues
+        if item.get("category") == "permission" or item.get("error_type") == "PermissionError"
+    ]
+    filesystem_issues = [
+        item for item in structured_issues if item.get("category") == "filesystem"
+    ]
+    metadata_issues = [
+        item for item in structured_issues if item.get("category") == "java_metadata"
+    ]
+    skipped_links = [
+        item
+        for item in skipped_paths
+        if item.get("path_type") in {"junction", "symbolic_link", "reparse_point"}
+    ]
+    permission_count = int(issue_counts.get("permission", len(permission_issues)) or 0)
+    skipped_link_count = int(report.scope.get("skipped_link_count", len(skipped_links)) or 0)
+    limit_reasons = report.scope.get("limit_reasons") or []
 
     metric_values = [
         ("Java 자산", len(report.assets)),
@@ -180,8 +209,9 @@ def html_report(report: ScanReport) -> str:
         ("수정 확인", counts[Status.FIXED]),
         ("잠재 영향", counts[Status.POTENTIALLY_AFFECTED]),
         ("판정 불가/미평가", counts[Status.UNKNOWN] + counts[Status.NOT_ASSESSED]),
-        ("탐색 오류", len(report.errors)),
-        ("제한 도달", len(report.scope.get("limit_reasons") or [])),
+        ("실제 권한 오류", permission_count),
+        ("제한 도달", "예" if limit_reasons else "아니오"),
+        ("정상 제외 연결", skipped_link_count),
     ]
     metrics = "".join(
         f'<div class="metric"><span>{escape(label)}</span><strong>{value}</strong></div>'
@@ -270,7 +300,6 @@ def html_report(report: ScanReport) -> str:
     )
 
     roots = report.scope.get("roots") or []
-    limit_reasons = report.scope.get("limit_reasons") or []
     scope_rows = [
         ("탐색 모드", report.scope.get("mode", "-")),
         ("탐색 루트", ", ".join(str(item) for item in roots) or "없음"),
@@ -281,6 +310,10 @@ def html_report(report: ScanReport) -> str:
         ("심볼릭 링크 추적", report.scope.get("follow_symlinks", "-")),
         ("Java 실행 허용", report.scope.get("java_execution_enabled", "-")),
         ("패키지 메타데이터", report.scope.get("package_metadata_enabled", "-")),
+        ("실제 접근 권한 오류", permission_count),
+        ("파일 시스템 오류", int(issue_counts.get("filesystem", len(filesystem_issues)) or 0)),
+        ("Java 메타데이터 오류", int(issue_counts.get("java_metadata", len(metadata_issues)) or 0)),
+        ("정상 제외 연결 디렉터리", skipped_link_count),
         ("제한/중단 사유", ", ".join(str(item) for item in limit_reasons) or "없음"),
     ]
     scope_table = "".join(
@@ -292,7 +325,40 @@ def html_report(report: ScanReport) -> str:
         f"<li>{_reference_links([str(url)])}</li>" for url in report.sources
     ) or "<li>없음</li>"
     limitation_items = _items(report.limitations)
-    error_items = _items(report.errors)
+
+    def issue_lines(values: list[dict[str, Any]]) -> list[str]:
+        return [
+            f"{item.get('path', '-')} — {item.get('operation', '-')} "
+            f"({item.get('error_type', 'OSError')}: {item.get('message', '-')})"
+            for item in values
+        ]
+
+    permission_items = _items(issue_lines(permission_issues))
+    filesystem_items = _items(issue_lines(filesystem_issues))
+    metadata_items = _items(issue_lines(metadata_issues))
+    skipped_link_items = _items(
+        [
+            f"{item.get('path', '-')} — {item.get('path_type', 'reparse_point')} / "
+            f"{item.get('reason', 'link_not_followed')} / {item.get('reparse_tag_hex') or '태그 없음'}"
+            for item in skipped_links
+        ],
+        empty="없음 (연결 디렉터리로 인해 제외된 범위 없음)",
+    )
+    root_link_items = _items(
+        [
+            f"{item.get('path', '-')} — {item.get('path_type', 'link')} / "
+            f"탐색 루트로 진입 ({item.get('root_origin') or 'unknown'})"
+            for item in root_links
+        ]
+    )
+    legacy_error_items = _items(report.errors) if not structured_issues else ""
+    unavailable_scope_items = _items(
+        [
+            *[str(item.get("path", "-")) for item in structured_issues],
+            *[f"탐색 제한: {reason}" for reason in limit_reasons],
+        ],
+        empty="없음",
+    )
 
     return f"""<!doctype html>
 <html lang="ko">
@@ -313,7 +379,7 @@ h1 {{ margin:0; color:var(--navy); font-size:27px; line-height:1.2; }}
 .print-button {{ border:0; border-radius:5px; padding:10px 15px; background:var(--blue); color:#fff; font:700 13px inherit; cursor:pointer; }}
 .print-help {{ display:block; margin-top:7px; color:var(--gray); font-size:11px; }}
 .notice {{ margin:16px 0; padding:11px 13px; background:#fff7df; border-left:4px solid #d59416; }}
-.metrics {{ display:grid; grid-template-columns:repeat(7,minmax(100px,1fr)); gap:8px; margin:16px 0 22px; }}
+.metrics {{ display:grid; grid-template-columns:repeat(8,minmax(90px,1fr)); gap:8px; margin:16px 0 22px; }}
 .metric {{ min-height:72px; padding:10px; border:1px solid var(--line); border-radius:5px; background:var(--pale); }}
 .metric span {{ display:block; color:var(--gray); font-size:11px; }}
 .metric strong {{ display:block; color:var(--navy); font-size:24px; line-height:1.25; }}
@@ -361,7 +427,7 @@ footer {{ margin-top:28px; padding-top:11px; border-top:1px solid var(--line); c
   main {{ max-width:none; margin:0; padding:0; box-shadow:none; }}
   .no-print {{ display:none !important; }}
   header {{ padding-bottom:4mm; }} h1 {{ font-size:19pt; }} h2 {{ margin-top:5mm; font-size:13pt; }}
-  .metrics {{ grid-template-columns:repeat(7,1fr); gap:1.5mm; margin:4mm 0 5mm; }}
+  .metrics {{ grid-template-columns:repeat(8,1fr); gap:1.2mm; margin:4mm 0 5mm; }}
   .metric {{ min-height:15mm; padding:2mm; }} .metric strong {{ font-size:15pt; }}
   table {{ font-size:7.4pt; table-layout:fixed; }} th, td {{ padding:1.5mm; }}
   .table-wrap {{ overflow:visible !important; }} table {{ min-width:0 !important; }}
@@ -389,7 +455,16 @@ function printReport() {{ window.print(); }}
 <section aria-labelledby="assets-title"><h2 id="assets-title">Java 자산</h2><div class="table-wrap"><table class="assets-table"><thead><tr><th>공급업체</th><th>제품</th><th>배포판</th><th>정확한 버전</th><th>설치 경로</th><th>탐지 근거</th><th>자산 상태</th></tr></thead>{asset_rows}</table></div></section>
 <section aria-labelledby="findings-title"><h2 id="findings-title">CVE 판정 상세</h2><div class="table-wrap findings-table-wrap"><table class="findings-table"><thead><tr><th>CVE ID</th><th>유형 / 심각도</th><th>대상 자산</th><th>판정 상태</th><th>판정 근거</th><th>신뢰도</th><th>권고 사항</th><th>공식 참조</th></tr></thead>{finding_html}</table></div><div class="print-findings print-only">{finding_card_html}</div></section>
 <section aria-labelledby="scope-title"><h2 id="scope-title">탐색 범위와 제한</h2><table class="scope-table"><tbody>{scope_table}</tbody></table><h3>평가 제한 사항</h3><ul>{limitation_items}</ul></section>
-<section aria-labelledby="errors-title"><h2 id="errors-title">탐색 오류 및 미확인 영역</h2><ul>{error_items}</ul></section>
+<section aria-labelledby="errors-title"><h2 id="errors-title">탐색 오류 및 미확인 영역</h2>
+<h3>실제 접근 권한 오류</h3><ul>{permission_items}</ul>
+<h3>파일 시스템 오류</h3><ul>{filesystem_items}</ul>
+<h3>Java 메타데이터 읽기 실패</h3><ul>{metadata_items}</ul>
+<h3>탐색 제한 도달</h3><ul>{_items(limit_reasons)}</ul>
+<h3>검사에서 정상 제외된 연결 디렉터리</h3><ul>{skipped_link_items}</ul>
+<h3>탐색 루트로 지정된 연결 경로</h3><ul>{root_link_items}</ul>
+<h3>실제 영향 여부를 판단할 수 없는 범위</h3><ul>{unavailable_scope_items}</ul>
+{f'<h3>기타 탐색 오류</h3><ul>{legacy_error_items}</ul>' if legacy_error_items else ''}
+</section>
 <section aria-labelledby="sources-title"><h2 id="sources-title">공식 근거</h2><ul>{source_items}</ul></section>
 <footer>JVI DB {escape(report.database_version)} · 생성 시각 {_text(report.completed_at or report.scan_time)}</footer>
 </main>

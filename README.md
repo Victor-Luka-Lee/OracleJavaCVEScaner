@@ -24,16 +24,18 @@ Oracle Java SE, Oracle JavaFX, Oracle GraalVM for JDK, Oracle GraalVM Enterprise
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux:   source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ui]"
 pytest
 ```
 
 ### uv
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra ui
 uv run pytest
 ```
+
+Streamlit은 서버용 CLI의 기본 의존성이 아닙니다. CLI만 설치할 때는 `pip install -e .`, 대시보드가 필요할 때만 `pip install -e ".[ui]"`를 사용합니다.
 
 ## 원클릭 자동 점검
 
@@ -95,6 +97,8 @@ python -m jvi scan --quick --verbose
 python -m jvi ui
 ```
 
+독립 실행형 서버 CLI에는 Streamlit을 포함하지 않습니다. 해당 바이너리에서 `ui`를 요청하면 지원되지 않는 기능임을 안내하고 종료 코드 2를 반환합니다.
+
 `--path`는 반복할 수 있습니다. 기본 점검은 `release`와 로컬 설치/패키지 메타데이터만 읽으며 Java를 실행하지 않습니다. 메타데이터가 없는 런타임에 한해 사용자가 `--allow-java-execution`을 명시하면 `java -version`을 `shell=False`, 5초 제한으로 실행합니다.
 
 주요 안전/범위 옵션:
@@ -128,6 +132,10 @@ Java 8은 update와 build를 독립적으로 비교합니다. KISA 표기의 `8u
 
 Windows에서는 `PATH`, `JAVA_HOME`, `Program Files`, `Program Files (x86)`, 고정된 JavaSoft 레지스트리 키와 사용자 경로를 확인합니다. Linux에서는 `PATH`, `JAVA_HOME`, `/usr/lib/jvm`, 확장 모드의 `/opt`, `/usr/local`, 그리고 가능할 경우 로컬 패키지 소유자 정보를 확인합니다.
 
+Windows 탐색은 Symbolic Link뿐 아니라 Junction과 기타 Reparse Point를 `follow_symlinks=False`에서 따라가지 않습니다. Python 3.12 이상에서는 `Path.is_junction()`을 사용하고, Python 3.11에서는 Windows 파일 속성과 reparse tag를 사용합니다. 자동 발견된 호환성 Junction은 정상 제외 경로로 보고하므로 그 사실만으로 점검 미완료가 되지 않습니다. 반면 일반 디렉터리의 `PermissionError`, 파일 시스템 오류, Java 메타데이터 읽기 실패는 별도로 기록하고 점검 미완료에 반영합니다.
+
+사용자가 `--path`로 지정했거나 `JAVA_HOME`·레지스트리 등으로 탐색 루트가 된 연결 경로는 해당 루트에 한해 진입합니다. 이후 발견되는 연결 디렉터리에는 다시 링크 추적 정책을 적용하며, 파일 ID/디바이스 ID로 중복 대상과 순환 참조를 차단합니다. 폴더 이름을 기준으로 `Windows NT` 같은 디렉터리를 광범위하게 제외하지 않습니다.
+
 우선순위는 JDK/JRE `release` 파일 → JavaFX 메타데이터 → 패키지 관리자 정보 → 사용자가 승인한 `java -version`입니다. 버전은 Java 8의 update/build/perf 표기와 Java 11/17/21/25/27의 다중 숫자 표기를 정수 튜플로 정규화하며 문자열 사전식 비교를 사용하지 않습니다.
 
 ## 프로젝트 구조
@@ -145,9 +153,29 @@ jvi/
   ui.py         한국어 Streamlit UI와 백그라운드 중단 처리
 data/advisories/oracle_2026_11.json
 tests/          가상 release fixture 기반 pytest
+packaging/      PyInstaller spec, OS별 빌드 스크립트와 배포 안내
+scripts/        독립 실행 파일 black-box smoke test
 ```
 
 상세 설계는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하십시오.
+
+## 독립 실행형 배포
+
+Windows x64와 Linux x86-64는 PyInstaller one-file을 기본으로 제공하며, 임시 실행 파일 정책이 엄격한 환경을 위해 one-folder 패키지도 생성합니다. 두 운영체제는 각각 해당 OS에서 빌드하며 크로스 컴파일하지 않습니다.
+
+```powershell
+# Windows x64 / Python 3.12
+./packaging/build_windows.ps1 -Python python
+```
+
+```bash
+# Linux x86-64 / Python 3.12
+JVI_PYTHON=python3.12 bash packaging/build_linux.sh
+```
+
+빌드 스크립트는 테스트, PyInstaller 6.11.1 빌드, 고립 환경 smoke test, 원본/one-file/one-folder 판정 비교, 압축과 SHA-256 생성을 연속 수행합니다. GitHub Actions는 수동 실행과 `v*` 태그를 지원하며 테스트가 성공한 산출물만 Artifact/태그 릴리스로 전달합니다.
+
+자세한 산출물 경로, glibc 2.28 기준선, `/tmp noexec` 대안, 플랫폼별 검증 상태는 [독립 실행형 빌드 및 배포 매뉴얼](docs/BUILDING.md)을 참고하십시오.
 
 ## 테스트
 
@@ -155,7 +183,7 @@ tests/          가상 release fixture 기반 pytest
 pytest
 ```
 
-테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. 기존 판정 회귀 테스트와 함께 인자 없는 실행, 기존 CLI 파싱, 자동 범위 제한, Java 미설치/다중 설치, timeout, HTML 단일 자동 출력, 명시적 JSON/CSV 출력, 저장 경로 폴백/권한 실패, DB 오류, Windows/Linux/PyInstaller 경로, 한글 콘솔, 원자적 폴더 충돌 및 동시성, XSS·URL 스킴 방어, A4 인쇄 CSS를 검증합니다.
+테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. 기존 판정 회귀 테스트와 함께 인자 없는 실행, 기존 CLI 파싱, 자동 범위 제한, Java 미설치/다중 설치, timeout, HTML 단일 자동 출력, 명시적 JSON/CSV 출력, 저장 경로 폴백/권한 실패, DB 오류, Windows Junction·Symbolic Link·Reparse Point·순환 참조, Python 3.11 속성 fallback, Windows/Linux/PyInstaller 경로, 한글 콘솔, 원자적 폴더 충돌 및 동시성, XSS·URL 스킴 방어, A4 인쇄 CSS를 검증합니다.
 
 ## 보안 특성
 
@@ -166,7 +194,9 @@ pytest
 - subprocess는 인자 배열과 `shell=False` 사용
 - HTML은 모든 수집 문자열을 이스케이프하고 HTTP(S) 링크만 허용
 - CSV 수식 주입 문자를 이스케이프
-- 취약점 JSON은 동반 SHA-256 파일이 있으면 로드 전에 검증
+- 취약점 JSON은 동반 SHA-256 파일이 반드시 있어야 하며 로드 전에 검증
+
+SHA-256은 파일 내용의 일치 여부를 확인하는 체크섬이며 배포자 신원을 보증하는 전자서명은 아닙니다. 독립 실행 파일은 내장 DB를 사용하고 런타임 다운로드나 자동 업데이트를 수행하지 않습니다.
 
 ## 새 CVE 추가
 
@@ -184,5 +214,5 @@ pytest
 - Windows Store/MSI 전체 인벤토리와 Linux 컨테이너 패키지 DB는 별도 수집하지 않습니다.
 - OpenJDK 벤더별 2026년 11월 공지는 이 검증 데이터 세트에 포함하지 않았으므로 `NOT_ASSESSED`로 두며 수정 여부를 추정하지 않습니다.
 - 공식 공지의 버전 판정과 실제 애플리케이션 입력 경로·CPU 특성·샌드박스 조건 검증은 별개입니다.
-- PyInstaller 독립 실행 파일 빌드는 이번 단계에 포함하지 않았으며 다음 패키징 단계에서 `JVI.exe`로 생성합니다.
+- Windows Authenticode와 Linux 패키지 서명은 아직 적용하지 않았습니다. 제공되는 SHA-256은 코드 서명을 대체하지 않습니다.
 

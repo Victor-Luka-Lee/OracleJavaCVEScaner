@@ -33,6 +33,18 @@ def execute_scan(
     if phase:
         phase("evaluation")
     findings = evaluate_assets(result.assets, database)
+    issue_counts = {
+        "permission": sum(
+            issue.category == "permission" or issue.error_type == "PermissionError"
+            for issue in result.issues
+        ),
+        "filesystem": sum(issue.category == "filesystem" for issue in result.issues),
+        "java_metadata": sum(issue.category == "java_metadata" for issue in result.issues),
+    }
+    skipped_link_count = sum(
+        item.path_type in {"junction", "symbolic_link", "reparse_point"}
+        for item in result.skipped_paths
+    )
     limitations = [
         DISCLAIMER,
         "Oracle 공지에 명시된 정확한 제품/빌드만 영향 범위로 사용하며 이전 버전을 임의 확장하지 않습니다.",
@@ -41,9 +53,21 @@ def execute_scan(
         "기본 점검은 release 파일과 로컬 메타데이터를 사용하며 Java 바이너리를 실행하지 않습니다.",
         "내장 런타임은 설정한 깊이·파일 수·시간 제한 안에서만 발견됩니다.",
     ]
+    if skipped_link_count:
+        limitations.append(
+            f"follow_symlinks=False 정책에 따라 자동 발견된 연결 디렉터리 {skipped_link_count}개를 "
+            "정상적으로 제외했습니다. 이 제외만으로 점검 미완료로 처리하지 않습니다."
+        )
+    if result.root_links:
+        limitations.append(
+            f"탐색 루트로 지정된 연결 경로 {len(result.root_links)}개는 해당 루트만 진입하고, "
+            "그 아래에서 발견되는 연결 지점에는 일반 링크 정책을 적용했습니다."
+        )
     if result.incomplete:
-        reasons = ", ".join(result.limit_reasons) if result.limit_reasons else "access_errors"
-        limitations.append(f"일부 점검 미완료: 탐색 제한 또는 오류가 발생했습니다 ({reasons}).")
+        reasons = [*result.limit_reasons, *sorted({issue.category for issue in result.issues})]
+        limitations.append(
+            f"일부 점검 미완료: 탐색 제한 또는 오류가 발생했습니다 ({', '.join(reasons)})."
+        )
     scan_completed = datetime.now().astimezone()
     return ScanReport(
         scan_time=scan_started.isoformat(),
@@ -61,6 +85,11 @@ def execute_scan(
             "stopped": result.stopped,
             "incomplete": result.incomplete,
             "limit_reasons": result.limit_reasons,
+            "issue_counts": issue_counts,
+            "issues": [issue.to_dict() for issue in result.issues],
+            "skipped_paths": [item.to_dict() for item in result.skipped_paths],
+            "skipped_link_count": skipped_link_count,
+            "root_links": [item.to_dict() for item in result.root_links],
         },
         assets=result.assets,
         findings=findings,

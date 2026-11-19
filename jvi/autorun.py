@@ -172,6 +172,9 @@ def _summary(logger: RunLogger, report: ScanReport, run: ReportRun, elapsed: flo
     for finding in report.findings:
         counts[finding.status] += 1
     incomplete = bool(report.scope.get("incomplete") or report.errors)
+    issue_counts = report.scope.get("issue_counts") or {}
+    permission_errors = int(issue_counts.get("permission", 0) or 0)
+    skipped_links = int(report.scope.get("skipped_link_count", 0) or 0)
     logger.emit("")
     logger.emit("========================================")
     logger.emit(" 일부 점검 미완료" if incomplete else " 점검 완료")
@@ -185,9 +188,11 @@ def _summary(logger: RunLogger, report: ScanReport, run: ReportRun, elapsed: flo
         "판정 불가 및 미평가: "
         f"UNKNOWN {counts[Status.UNKNOWN]}건 + NOT_ASSESSED {counts[Status.NOT_ASSESSED]}건"
     )
-    logger.emit(f"탐색 오류: {len(report.errors)}건")
+    logger.emit(f"실제 접근 권한 오류: {permission_errors}건")
+    logger.emit(f"기타 탐색/메타데이터 오류: {max(0, len(report.errors) - permission_errors)}건")
     reasons = report.scope.get("limit_reasons") or []
     logger.emit(f"탐색 제한 도달: {', '.join(str(item) for item in reasons) if reasons else '없음'}")
+    logger.emit(f"정상 제외된 연결 디렉터리: {skipped_links}개")
     logger.emit(f"점검 소요 시간: {elapsed:.2f}초")
     logger.emit(f"보고서 실행 폴더: {run.directory}")
     logger.emit(f"HTML 보고서: {run.html}")

@@ -4,6 +4,7 @@ __pycache__/
 .pytest-tmp/
 .test-deps/
 .venv/
+.build-venv-*/
 dist/
 build/
 reports/

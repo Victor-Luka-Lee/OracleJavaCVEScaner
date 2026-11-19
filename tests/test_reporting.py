@@ -144,3 +144,69 @@ def test_csv_includes_scan_errors_and_incomplete_reason(database, asset_factory)
     assert "권한 오류 fixture" in output
     assert "SCAN_INCOMPLETE" in output
     assert "timeout" in output
+
+
+def test_html_distinguishes_permission_errors_and_normally_skipped_links(database, asset_factory):
+    report = _report(database, asset_factory("21.0.13.0.3"))
+    report.scope.update(
+        {
+            "incomplete": True,
+            "limit_reasons": ["timeout"],
+            "issue_counts": {"permission": 1, "filesystem": 0, "java_metadata": 0},
+            "issues": [
+                {
+                    "category": "permission",
+                    "path": r"C:\Program Files\RestrictedJava",
+                    "operation": "디렉터리 열기",
+                    "error_type": "PermissionError",
+                    "message": "access denied",
+                }
+            ],
+            "skipped_link_count": 1,
+            "skipped_paths": [
+                {
+                    "path": r"C:\Program Files\Windows NT\보조프로그램",
+                    "path_type": "junction",
+                    "reason": "link_not_followed",
+                    "reparse_tag": 0xA0000003,
+                    "reparse_tag_hex": "0xA0000003",
+                    "root_origin": None,
+                }
+            ],
+            "root_links": [],
+        }
+    )
+    report.errors = ["[접근 권한 오류] fixture"]
+    html = html_report(report)
+    assert "실제 접근 권한 오류" in html
+    assert "RestrictedJava" in html
+    assert "정상 제외 연결" in html
+    assert "Windows NT\\보조프로그램" in html
+    assert "0xA0000003" in html
+    assert "탐색 제한 도달" in html
+    assert "timeout" in html
+    assert "실제 영향 여부를 판단할 수 없는 범위" in html
+
+
+def test_html_skipped_junction_alone_can_still_be_complete(database, asset_factory):
+    report = _report(database, asset_factory("21.0.13.0.3"))
+    report.scope.update(
+        {
+            "incomplete": False,
+            "issue_counts": {"permission": 0, "filesystem": 0, "java_metadata": 0},
+            "issues": [],
+            "skipped_link_count": 1,
+            "skipped_paths": [
+                {
+                    "path": r"C:\compatibility-junction",
+                    "path_type": "junction",
+                    "reason": "link_not_followed",
+                    "reparse_tag_hex": "0xA0000003",
+                }
+            ],
+        }
+    )
+    html = html_report(report)
+    assert "점검 완료" in html
+    assert "일부 점검 미완료" not in html
+    assert "C:\\compatibility-junction" in html

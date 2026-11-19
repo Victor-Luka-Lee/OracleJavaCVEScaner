@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 
@@ -12,9 +13,31 @@ class AdvisoryDataError(ValueError):
     pass
 
 
-_SOURCE_ADVISORY = Path(__file__).resolve().parent.parent / "data" / "advisories" / "oracle_2026_11.json"
-_PACKAGED_ADVISORY = Path(__file__).resolve().parent / "data" / "advisories" / "oracle_2026_11.json"
-DEFAULT_ADVISORY = _SOURCE_ADVISORY if _SOURCE_ADVISORY.exists() else _PACKAGED_ADVISORY
+_ADVISORY_NAME = "oracle_2026_11.json"
+
+
+def default_advisory_path() -> Path:
+    """Locate the bundled database without confusing it with writable reports."""
+    module_directory = Path(__file__).resolve().parent
+    candidates: list[Path] = []
+    if getattr(sys, "frozen", False):
+        bundle_root = Path(getattr(sys, "_MEIPASS", module_directory))
+        candidates.extend(
+            [
+                bundle_root / "jvi" / "data" / "advisories" / _ADVISORY_NAME,
+                bundle_root / "data" / "advisories" / _ADVISORY_NAME,
+            ]
+        )
+    candidates.extend(
+        [
+            module_directory.parent / "data" / "advisories" / _ADVISORY_NAME,
+            module_directory / "data" / "advisories" / _ADVISORY_NAME,
+        ]
+    )
+    return next((path for path in candidates if path.is_file()), candidates[0])
+
+
+DEFAULT_ADVISORY = default_advisory_path()
 
 REQUIRED_FIELDS = {
     "cve_id",
@@ -52,13 +75,15 @@ def load_database(path: str | Path = DEFAULT_ADVISORY, *, verify_integrity: bool
 
     if verify_integrity:
         checksum_path = data_path.with_suffix(data_path.suffix + ".sha256")
-        if checksum_path.exists():
+        try:
             expected = checksum_path.read_text(encoding="ascii").strip().split()[0].lower()
-            actual = hashlib.sha256(raw).hexdigest()
-            if expected != actual:
-                raise AdvisoryDataError(
-                    f"advisory database SHA-256 mismatch: expected {expected}, got {actual}"
-                )
+        except (OSError, UnicodeError, IndexError) as exc:
+            raise AdvisoryDataError(f"cannot read advisory SHA-256 file: {checksum_path}") from exc
+        actual = hashlib.sha256(raw).hexdigest()
+        if expected != actual:
+            raise AdvisoryDataError(
+                f"advisory database SHA-256 mismatch: expected {expected}, got {actual}"
+            )
 
     try:
         database = json.loads(raw.decode("utf-8"))

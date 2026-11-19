@@ -10,7 +10,7 @@ import pytest
 from jvi import autorun
 from jvi.advisory import AdvisoryDataError
 from jvi.autorun import AutoExitCode
-from jvi.discovery import DiscoveryResult
+from jvi.discovery import DiscoveryIssue, DiscoveryResult, SkippedPath
 
 
 FIXED_NOW = datetime(2026, 11, 18, 17, 11, 0)
@@ -23,15 +23,29 @@ ENVIRONMENT = {
 }
 
 
-def _result(*, assets=None, errors=None, stopped=False, incomplete=False, reasons=None):
+def _result(
+    *,
+    assets=None,
+    errors=None,
+    stopped=False,
+    incomplete=False,
+    reasons=None,
+    issues=None,
+    skipped_paths=None,
+    root_links=None,
+):
+    issue_values = issues or []
     return DiscoveryResult(
         assets=assets or [],
-        errors=errors or [],
+        errors=errors if errors is not None else [item.summary() for item in issue_values],
         examined_entries=17,
         stopped=stopped,
         incomplete=incomplete,
         limit_reasons=reasons or [],
         roots=["C:\\Program Files", "C:\\Program Files (x86)"],
+        issues=issue_values,
+        skipped_paths=skipped_paths or [],
+        root_links=root_links or [],
     )
 
 
@@ -125,6 +139,41 @@ def test_timeout_is_partial_not_success(tmp_path, monkeypatch, database):
     assert "일부 점검 미완료" in output
     assert "탐색 제한 도달: timeout" in output
     assert " 점검 완료\n" not in output
+
+
+def test_normally_skipped_junction_does_not_make_one_click_partial(tmp_path, monkeypatch, database):
+    result = _result(
+        skipped_paths=[
+            SkippedPath(
+                path=r"C:\Program Files\Windows NT\보조프로그램",
+                path_type="junction",
+                reason="link_not_followed",
+                reparse_tag=0xA0000003,
+            )
+        ]
+    )
+    code, output, errors = _run(tmp_path, monkeypatch, database, result)
+    assert code == AutoExitCode.COMPLETE
+    assert " 점검 완료" in output
+    assert "정상 제외된 연결 디렉터리: 1개" in output
+    assert "실제 접근 권한 오류: 0건" in output
+    assert errors == ""
+
+
+def test_real_permission_issue_keeps_one_click_partial(tmp_path, monkeypatch, database):
+    issue = DiscoveryIssue(
+        category="permission",
+        path=r"C:\Program Files\RestrictedJava",
+        operation="디렉터리 열기",
+        error_type="PermissionError",
+        message="access denied",
+    )
+    result = _result(issues=[issue], incomplete=True)
+    code, output, errors = _run(tmp_path, monkeypatch, database, result)
+    assert code == AutoExitCode.PARTIAL
+    assert "일부 점검 미완료" in output
+    assert "실제 접근 권한 오류: 1건" in output
+    assert "RestrictedJava" in errors
 
 
 def test_report_directory_falls_back_when_primary_is_not_writable(tmp_path, monkeypatch, database):
