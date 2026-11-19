@@ -30,73 +30,58 @@ class AutoExitCode(IntEnum):
 
 
 class ReportDirectoryError(OSError):
-    pass
+    """Raised when neither the primary nor fallback report root is writable."""
 
 
 @dataclass(frozen=True, slots=True)
-class ReportPaths:
-    directory: Path
-    stem: str
-    html: Path
-    json: Path
-    csv: Path
-    log: Path
-    reservation: Path
+class ReportRun:
+    """A uniquely reserved directory for one automatic scan."""
 
-    def release(self) -> None:
-        try:
-            self.reservation.unlink(missing_ok=True)
-        except OSError:
-            pass
+    root: Path
+    directory: Path
+    html: Path
 
 
 class RunLogger:
-    """Mirror Korean console progress into a UTF-8 execution log."""
+    """Write Korean progress messages to the supplied console streams."""
 
     def __init__(self, stdout: TextIO, stderr: TextIO) -> None:
         self.stdout = stdout
         self.stderr = stderr
-        self._history: list[tuple[str, str]] = []
-        self._handle: TextIO | None = None
-
-    def attach(self, path: Path) -> None:
-        self._handle = path.open("x", encoding="utf-8", newline="")
-        for level, message in self._history:
-            self._write_log(level, message)
-
-    def _write_log(self, level: str, message: str) -> None:
-        if self._handle is None:
-            return
-        stamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        self._handle.write(f"{stamp} {level} {message}\n")
-        self._handle.flush()
 
     def emit(self, message: str = "", *, error: bool = False) -> None:
-        level = "ERROR" if error else "INFO"
         print(message, file=self.stderr if error else self.stdout, flush=True)
-        self._history.append((level, message))
-        self._write_log(level, message)
 
     def exception(self, context: str, exc: BaseException) -> None:
         self.emit(f"{context}: {exc.__class__.__name__}: {exc}", error=True)
         detail = "".join(traceback.format_exception(exc)).rstrip()
-        self._history.append(("TRACE", detail))
-        self._write_log("TRACE", detail)
+        self.emit(detail, error=True)
 
-    def close(self) -> None:
-        if self._handle is not None:
-            self._handle.close()
-            self._handle = None
+
+_WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "CLOCK$",
+    *(f"COM{number}" for number in range(1, 10)),
+    *(f"LPT{number}" for number in range(1, 10)),
+}
 
 
 def safe_hostname(value: str) -> str:
+    """Normalize an untrusted hostname into a portable file-name component."""
     normalized = unicodedata.normalize("NFKD", value or "")
     ascii_name = normalized.encode("ascii", "ignore").decode("ascii")
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._-")
-    return (safe[:64] or "HOST").upper()
+    safe = (safe[:64] or "HOST").upper()
+    if safe.split(".", 1)[0] in _WINDOWS_RESERVED_NAMES:
+        safe = f"HOST_{safe}"
+    return safe
 
 
 def execution_directory() -> Path:
+    """Return the source/launcher directory, never a PyInstaller _MEIPASS path."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     argv0 = Path(sys.argv[0]) if sys.argv else Path()
@@ -133,6 +118,7 @@ def _ensure_writable_directory(path: Path) -> None:
 
 
 def select_report_directory(primary_base: Path, fallback: Path | None = None) -> tuple[Path, list[str]]:
+    """Choose the report root, falling back to a per-user state directory."""
     warnings: list[str] = []
     primary = primary_base / "reports"
     try:
@@ -151,29 +137,22 @@ def select_report_directory(primary_base: Path, fallback: Path | None = None) ->
         ) from exc
 
 
-def reserve_report_paths(directory: Path, hostname: str, when: datetime) -> ReportPaths:
-    base = f"JVI_{safe_hostname(hostname)}_{when.strftime('%Y%m%d_%H%M%S')}"
+def reserve_report_directory(report_root: Path, hostname: str, when: datetime) -> ReportRun:
+    """Atomically reserve one immutable scan directory without overwriting data."""
+    base = when.strftime("%Y-%m-%d_%H-%M-%S")
     for number in range(10_000):
-        stem = base if number == 0 else f"{base}_{number:02d}"
-        outputs = {suffix: directory / f"{stem}.{suffix}" for suffix in ("html", "json", "csv", "log")}
-        if any(path.exists() for path in outputs.values()):
-            continue
-        reservation = directory / f".{stem}.lock"
+        name = base if number == 0 else f"{base}_{number:03d}"
+        directory = report_root / name
         try:
-            descriptor = os.open(reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.close(descriptor)
+            directory.mkdir(exist_ok=False)
         except FileExistsError:
             continue
-        return ReportPaths(
+        return ReportRun(
+            root=report_root,
             directory=directory,
-            stem=stem,
-            html=outputs["html"],
-            json=outputs["json"],
-            csv=outputs["csv"],
-            log=outputs["log"],
-            reservation=reservation,
+            html=directory / f"JVI_{safe_hostname(hostname)}.html",
         )
-    raise FileExistsError(f"사용 가능한 보고서 파일명을 만들 수 없습니다: {base}")
+    raise FileExistsError(f"사용 가능한 보고서 실행 폴더를 만들 수 없습니다: {base}")
 
 
 def automatic_scan_config() -> ScanConfig:
@@ -188,7 +167,7 @@ def automatic_scan_config() -> ScanConfig:
     )
 
 
-def _summary(logger: RunLogger, report: ScanReport, paths: ReportPaths, elapsed: float) -> None:
+def _summary(logger: RunLogger, report: ScanReport, run: ReportRun, elapsed: float) -> None:
     counts = {status: 0 for status in Status}
     for finding in report.findings:
         counts[finding.status] += 1
@@ -200,6 +179,7 @@ def _summary(logger: RunLogger, report: ScanReport, paths: ReportPaths, elapsed:
     logger.emit(f"탐지된 Java 자산: {len(report.assets)}개")
     logger.emit(f"전체 CVE 판정: {len(report.findings)}건")
     logger.emit(f"CVE 영향 확인(AFFECTED): {counts[Status.AFFECTED]}건")
+    logger.emit(f"수정 확인(FIXED): {counts[Status.FIXED]}건")
     logger.emit(f"잠재 영향(POTENTIALLY_AFFECTED): {counts[Status.POTENTIALLY_AFFECTED]}건")
     logger.emit(
         "판정 불가 및 미평가: "
@@ -207,12 +187,10 @@ def _summary(logger: RunLogger, report: ScanReport, paths: ReportPaths, elapsed:
     )
     logger.emit(f"탐색 오류: {len(report.errors)}건")
     reasons = report.scope.get("limit_reasons") or []
-    logger.emit(f"탐색 제한 도달: {', '.join(reasons) if reasons else '없음'}")
+    logger.emit(f"탐색 제한 도달: {', '.join(str(item) for item in reasons) if reasons else '없음'}")
     logger.emit(f"점검 소요 시간: {elapsed:.2f}초")
-    logger.emit(f"HTML 보고서: {paths.html}")
-    logger.emit(f"JSON 보고서: {paths.json}")
-    logger.emit(f"CSV 보고서: {paths.csv}")
-    logger.emit(f"실행 로그: {paths.log}")
+    logger.emit(f"보고서 실행 폴더: {run.directory}")
+    logger.emit(f"HTML 보고서: {run.html}")
 
 
 def _exit_code(report: ScanReport) -> AutoExitCode:
@@ -235,16 +213,16 @@ def run_automatic_scan(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Run the no-input, extended local assessment and save four artifacts."""
-    started = time.monotonic()
+    """Run the no-input, extended assessment and save one self-contained HTML report."""
+    monotonic_started = time.monotonic()
+    scan_started = now or datetime.now().astimezone()
     logger = RunLogger(stdout or sys.stdout, stderr or sys.stderr)
-    paths: ReportPaths | None = None
     logger.emit("========================================")
     logger.emit(" Java Vulnerability Inspector")
     logger.emit(" Oracle Java CVE Scanner")
     logger.emit("========================================")
     logger.emit("")
-    logger.emit("[1/4] 시스템 환경 확인")
+    logger.emit("[1/5] 시스템 환경 및 취약점 DB 확인")
     environment = environment_summary()
     logger.emit(
         f"운영체제: {environment.get('os', 'UNKNOWN')} {environment.get('os_release', '')} / "
@@ -253,18 +231,11 @@ def run_automatic_scan(
     logger.emit(f"호스트명: {environment.get('hostname', 'UNKNOWN')}")
 
     try:
-        report_dir, warnings = select_report_directory(
+        report_root, warnings = select_report_directory(
             primary_dir or execution_directory(), fallback=fallback_dir
         )
-        paths = reserve_report_paths(
-            report_dir,
-            environment.get("hostname", "HOST"),
-            now or datetime.now().astimezone(),
-        )
-        logger.attach(paths.log)
         for warning in warnings:
             logger.emit(warning)
-
         logger.emit("취약점 DB 로드 및 SHA-256 무결성 검증")
         database = load_database(DEFAULT_ADVISORY, verify_integrity=True)
         logger.emit(f"취약점 DB 버전: {database['database_version']}")
@@ -272,10 +243,10 @@ def run_automatic_scan(
 
         def phase(name: str) -> None:
             if name == "discovery" and name not in printed:
-                logger.emit("[2/4] Java 설치 정보 탐색")
+                logger.emit("[2/5] Java 설치 정보 탐색")
                 printed.add(name)
             elif name == "evaluation" and name not in printed:
-                logger.emit("[3/4] CVE 취약점 분석")
+                logger.emit("[3/5] CVE 취약점 분석")
                 printed.add(name)
 
         report = execute_scan(
@@ -283,20 +254,26 @@ def run_automatic_scan(
             database,
             phase=phase,
             environment=environment,
+            started_at=scan_started,
         )
         report.scope["automatic_mode"] = True
-        report.scope["report_directory"] = str(report_dir)
         for scan_error in report.errors:
             logger.emit(f"탐색 오류: {scan_error}", error=True)
         if report.scope.get("incomplete"):
             reasons = report.scope.get("limit_reasons") or ["access_errors"]
-            logger.emit(f"일부 점검 미완료: {', '.join(reasons)}")
-        logger.emit("[4/4] 보고서 생성")
-        write_report(report, "html", paths.html, overwrite=False)
-        write_report(report, "json", paths.json, overwrite=False)
-        write_report(report, "csv", paths.csv, overwrite=False)
-        elapsed = time.monotonic() - started
-        _summary(logger, report, paths, elapsed)
+            logger.emit(f"일부 점검 미완료: {', '.join(str(item) for item in reasons)}")
+
+        logger.emit("[4/5] 보고서 폴더 생성 및 HTML 저장")
+        run = reserve_report_directory(
+            report_root,
+            environment.get("hostname", "HOST"),
+            scan_started,
+        )
+        report.scope["report_directory"] = str(run.directory)
+        write_report(report, "html", run.html, overwrite=False)
+        logger.emit("[5/5] 결과 요약 및 저장 위치 안내")
+        elapsed = time.monotonic() - monotonic_started
+        _summary(logger, report, run, elapsed)
         return int(_exit_code(report))
     except AdvisoryDataError as exc:
         logger.exception("취약점 DB 오류로 자동 점검 실패", exc)
@@ -307,7 +284,3 @@ def run_automatic_scan(
     except Exception as exc:
         logger.exception("예기치 않은 오류로 자동 점검 실패", exc)
         return int(AutoExitCode.FATAL_ERROR)
-    finally:
-        logger.close()
-        if paths is not None:
-            paths.release()

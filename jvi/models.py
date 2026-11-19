@@ -70,6 +70,9 @@ class ScanReport:
     sources: list[str]
     limitations: list[str]
     errors: list[str] = field(default_factory=list)
+    started_at: str | None = None
+    completed_at: str | None = None
+    advisories: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,5 +85,8 @@ class ScanReport:
             "sources": self.sources,
             "limitations": self.limitations,
             "errors": self.errors,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "advisories": self.advisories,
         }
 

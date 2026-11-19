@@ -13,7 +13,7 @@ import streamlit as st
 from jvi.advisory import load_database
 from jvi.discovery import ScanConfig
 from jvi.models import ScanReport, Status
-from jvi.reporting import DISCLAIMER, csv_report, html_report, json_report
+from jvi.reporting import DISCLAIMER, html_report
 from jvi.workflow import execute_scan
 
 
@@ -161,10 +161,13 @@ if "job" in st.session_state:
         filtered = sorted(filtered, key=lambda row: str(row[sort_key]).casefold())
         st.dataframe(filtered, width="stretch", hide_index=True)
 
-        dl = st.columns(3)
-        dl[0].download_button("CSV 다운로드", csv_report(report).encode("utf-8-sig"), "jvi-report.csv", "text/csv", width="stretch")
-        dl[1].download_button("JSON 다운로드", json_report(report).encode("utf-8"), "jvi-report.json", "application/json", width="stretch")
-        dl[2].download_button("HTML 다운로드", html_report(report).encode("utf-8"), "jvi-report.html", "text/html", width="stretch")
+        st.download_button(
+            "HTML 보고서 다운로드",
+            html_report(report).encode("utf-8"),
+            "jvi-report.html",
+            "text/html",
+            width="stretch",
+        )
 
         st.subheader("취약점 상세")
         selected = st.selectbox("CVE", [item["cve_id"] for item in database["advisories"]])

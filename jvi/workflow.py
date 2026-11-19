@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 import threading
 from typing import Any, Callable
 
@@ -23,8 +23,10 @@ def execute_scan(
     progress: ProgressCallback | None = None,
     phase: PhaseCallback | None = None,
     environment: dict[str, str] | None = None,
+    started_at: datetime | None = None,
 ) -> ScanReport:
     """Discover assets, evaluate every CVE, and assemble a report model."""
+    scan_started = started_at or datetime.now().astimezone()
     if phase:
         phase("discovery")
     result = discover(config, stop_event=stop_event, progress=progress)
@@ -42,8 +44,9 @@ def execute_scan(
     if result.incomplete:
         reasons = ", ".join(result.limit_reasons) if result.limit_reasons else "access_errors"
         limitations.append(f"일부 점검 미완료: 탐색 제한 또는 오류가 발생했습니다 ({reasons}).")
+    scan_completed = datetime.now().astimezone()
     return ScanReport(
-        scan_time=datetime.now(timezone.utc).isoformat(),
+        scan_time=scan_started.isoformat(),
         environment=environment or environment_summary(),
         scope={
             "mode": config.mode,
@@ -65,4 +68,7 @@ def execute_scan(
         sources=database["sources"],
         limitations=limitations,
         errors=result.errors,
+        started_at=scan_started.isoformat(),
+        completed_at=scan_completed.isoformat(),
+        advisories=list(database.get("advisories", [])),
     )

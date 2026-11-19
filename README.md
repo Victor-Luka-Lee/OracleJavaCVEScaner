@@ -46,13 +46,17 @@ jvi
 
 자동 점검은 `max-depth=7`, `max-files=100000`, `timeout=180초`, 심볼릭 링크 추적 비활성화, Java 실행 비활성화, 패키지 메타데이터 조회 활성화로 고정됩니다. 시스템 전체 디스크를 무제한 탐색하지 않습니다. 제한 또는 접근 오류가 발생하면 보고서와 콘솔에 `일부 점검 미완료`가 표시됩니다.
 
-HTML, JSON, CSV, 실행 로그는 다음 우선순위에 따라 자동 저장됩니다.
+자동 모드는 다음 우선순위에 따라 보고서 루트를 선택합니다.
 
 1. 실행 파일 위치(모듈 실행 시 현재 디렉터리)의 `reports`
 2. Windows: `%LOCALAPPDATA%\JVI\reports`
 3. Linux: `$XDG_STATE_HOME/JVI/reports` 또는 `~/.local/state/JVI/reports`
 
-파일명은 `JVI_HOSTNAME_YYYYMMDD_HHMMSS.*`이며 안전하게 정규화됩니다. 같은 이름이 있으면 `_01`, `_02`를 붙이고 기존 보고서를 덮어쓰지 않습니다.
+점검마다 로컬 시작 시각을 사용한 `reports/YYYY-MM-DD_HH-MM-SS/` 폴더를 만들고, 그 안에 UTF-8 `JVI_HOSTNAME.html` 한 개만 저장합니다. 같은 초에 여러 점검이 시작되면 폴더에 `_001`, `_002`를 붙입니다. 폴더 생성은 원자적으로 수행되며 기존 폴더나 보고서를 삭제하거나 덮어쓰지 않습니다. PyInstaller 실행 시에는 `_MEIPASS`가 아니라 실행 파일이 있는 디렉터리를 기준으로 합니다.
+
+자동 모드는 JSON, CSV, 별도 로그 파일을 만들지 않습니다. JSON/CSV 출력은 명시적 `scan --format ... --output ...` CLI에서 계속 사용할 수 있습니다. Streamlit UI의 기본 다운로드도 HTML 한 종류입니다.
+
+HTML 상단의 **PDF로 저장 / 인쇄** 버튼은 브라우저의 인쇄 창을 엽니다. 인쇄 대상에서 PDF 저장을 선택할 수 있으며, 런타임에 PDF 라이브러리나 인터넷 연결은 필요하지 않습니다. A4 인쇄 스타일, 반복 표 머리글, 행 분할 방지, 긴 경로·근거의 줄바꿈 규칙을 문서 안에 포함합니다. 자동 점검이 브라우저를 직접 실행하지는 않습니다.
 
 자동 모드 종료 코드는 다음과 같습니다. 기존 `scan` 명령의 종료 동작은 변경하지 않았습니다.
 
@@ -103,7 +107,7 @@ python -m jvi ui
 - `--advisory FILE`: 별도 JSON DB 사용
 - `--no-integrity-check`: 동반 `.sha256` 검증을 명시적으로 생략
 
-출력 파일을 지정하지 않으면 `human`, JSON, CSV, HTML 모두 표준 출력에 기록합니다. HTML은 CSS를 문서에 포함하고 외부 스크립트나 외부 폰트를 사용하지 않아 인터넷 없이 열립니다.
+출력 파일을 지정하지 않으면 `human`, JSON, CSV, HTML 모두 표준 출력에 기록합니다. HTML은 CSS와 인쇄 버튼용 짧은 JavaScript를 문서에 포함하고 외부 스크립트, CDN, 외부 폰트를 사용하지 않아 인터넷 없이 열립니다. 보고서에서 제공하는 링크는 HTTP(S) 공식 근거만 활성화합니다.
 
 ## 판정 의미
 
@@ -151,7 +155,7 @@ tests/          가상 release fixture 기반 pytest
 pytest
 ```
 
-테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. 기존 판정 회귀 테스트와 함께 인자 없는 실행, 기존 CLI 파싱, 자동 범위 제한, Java 미설치/다중 설치, timeout, 보고서 4종, 저장 경로 폴백/권한 실패, DB 오류, Windows/Linux 상태 경로, 한글 콘솔, 예외 로깅, 파일명 충돌을 검증합니다.
+테스트는 실제 취약 Java 설치 없이 가상 `release` 파일과 `Asset` fixture를 사용합니다. 기존 판정 회귀 테스트와 함께 인자 없는 실행, 기존 CLI 파싱, 자동 범위 제한, Java 미설치/다중 설치, timeout, HTML 단일 자동 출력, 명시적 JSON/CSV 출력, 저장 경로 폴백/권한 실패, DB 오류, Windows/Linux/PyInstaller 경로, 한글 콘솔, 원자적 폴더 충돌 및 동시성, XSS·URL 스킴 방어, A4 인쇄 CSS를 검증합니다.
 
 ## 보안 특성
 
